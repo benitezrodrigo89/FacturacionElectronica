@@ -35,7 +35,7 @@ except ImportError as e:
 print("\n[2] Verificando certificado...")
 try:
     config = SifenConfig(
-        ambiente='prod',
+        ambiente='test',
         ruc=RUC,
         razon_social='AMARILLA ORTIZ OSVALDO MATHIAS ANTONIO',
         certificado_path=CERT_PATH,
@@ -56,11 +56,11 @@ except Exception as e:
     sys.exit(1)
 
 # 3. Conexion SIFEN
-print("\n[3] Probando conexion con SIFEN produccion...")
+print("\n[3] Probando conexion con SIFEN test...")
 try:
     import requests_pkcs12
     r = requests_pkcs12.get(
-        'https://sifen.set.gov.py/de/ws/consultas/consulta-ruc.wsdl',
+        'https://sifen-test.set.gov.py/de/ws/consultas/consulta-ruc.wsdl',
         pkcs12_filename=CERT_PATH,
         pkcs12_password=CERT_PASSWORD,
         verify=False,
@@ -70,7 +70,7 @@ try:
         print(f"    OK - Servidor responde ({len(r.content)} bytes)")
     elif r.status_code == 200 and len(r.content) == 0:
         print(f"    ADVERTENCIA - Servidor responde pero cuerpo vacio")
-        print(f"    Esto ocurre cuando la IP no es de Paraguay")
+        print(f"    Esto puede indicar IP bloqueada o certificado rechazado")
     else:
         print(f"    ERROR - HTTP {r.status_code}")
 except Exception as e:
@@ -82,4 +82,4 @@ print("=" * 55)
 print(f"\nDatos configurados:")
 print(f"  RUC:      {RUC}")
 print(f"  Timbrado: {TIMBRADO}")
-print(f"  Ambiente: PRODUCCION")
+print(f"  Ambiente: TEST")
