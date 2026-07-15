@@ -1,0 +1,85 @@
+"""
+Script de prueba para verificar la instalacion y conexion con SIFEN
+Ejecutar desde la carpeta raiz del proyecto:
+    python test_conexion.py
+"""
+import sys
+import warnings
+warnings.filterwarnings('ignore')
+
+sys.path.insert(0, 'sifen_py')
+
+CERT_PATH = 'certificado_sifen.pfx'
+CERT_PASSWORD = 'ferreteria2026.'
+RUC = '5722781-0'
+CSC = 'F106BB559CA81685185B8ea5082e46A1'
+TIMBRADO = '18934267'
+
+print("=" * 55)
+print("  TEST DE CONEXION SIFEN PARAGUAY")
+print("=" * 55)
+
+# 1. Imports
+print("\n[1] Verificando dependencias...")
+try:
+    from sifen_py.core.config import SifenConfig
+    from sifen_py.services.signer import XMLSigner
+    from sifen_py.services.soap_client import SifenSOAPClient
+    print("    OK - Todos los modulos cargados")
+except ImportError as e:
+    print(f"    ERROR - Falta instalar dependencias: {e}")
+    print("    Ejecuta: pip install -r sifen_py/requirements.txt")
+    sys.exit(1)
+
+# 2. Certificado
+print("\n[2] Verificando certificado...")
+try:
+    config = SifenConfig(
+        ambiente='prod',
+        ruc=RUC,
+        razon_social='AMARILLA ORTIZ OSVALDO MATHIAS ANTONIO',
+        certificado_path=CERT_PATH,
+        certificado_password=CERT_PASSWORD,
+        csc=CSC,
+        timbrado_numero=TIMBRADO,
+    )
+    signer = XMLSigner(config)
+    info = signer.get_certificate_info()
+    print(f"    OK - Titular: {info['subject'].get('commonName')}")
+    print(f"    OK - Valido hasta: {info['not_valid_after'].strftime('%d/%m/%Y')}")
+except FileNotFoundError:
+    print(f"    ERROR - No se encontro el certificado en: {CERT_PATH}")
+    print(f"    Coloca el archivo certificado_sifen.pfx en: {__file__[:__file__.rfind(chr(92))+1] or './'}")
+    sys.exit(1)
+except Exception as e:
+    print(f"    ERROR - {e}")
+    sys.exit(1)
+
+# 3. Conexion SIFEN
+print("\n[3] Probando conexion con SIFEN produccion...")
+try:
+    import requests_pkcs12
+    r = requests_pkcs12.get(
+        'https://sifen.set.gov.py/de/ws/consultas/consulta-ruc.wsdl',
+        pkcs12_filename=CERT_PATH,
+        pkcs12_password=CERT_PASSWORD,
+        verify=False,
+        timeout=15,
+    )
+    if r.status_code == 200 and len(r.content) > 0:
+        print(f"    OK - Servidor responde ({len(r.content)} bytes)")
+    elif r.status_code == 200 and len(r.content) == 0:
+        print(f"    ADVERTENCIA - Servidor responde pero cuerpo vacio")
+        print(f"    Esto ocurre cuando la IP no es de Paraguay")
+    else:
+        print(f"    ERROR - HTTP {r.status_code}")
+except Exception as e:
+    print(f"    ERROR - No se pudo conectar: {e}")
+
+print("\n" + "=" * 55)
+print("  Prueba completada")
+print("=" * 55)
+print(f"\nDatos configurados:")
+print(f"  RUC:      {RUC}")
+print(f"  Timbrado: {TIMBRADO}")
+print(f"  Ambiente: PRODUCCION")
