@@ -94,6 +94,25 @@ try:
 except Exception as e:
     print(f"    ERROR sin cert: {type(e).__name__}: {e}")
 
+# 4. Detalle del certificado
+print("\n[4] Detalle del certificado...")
+try:
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    from cryptography.hazmat.backends import default_backend
+    with open(CERT_PATH, 'rb') as f:
+        pfx_data = f.read()
+    _, cert, _ = pkcs12.load_key_and_certificates(pfx_data, CERT_PASSWORD.encode(), default_backend())
+    print("    Subject (titular):")
+    for attr in cert.subject:
+        print(f"      {attr.oid._name}: {attr.value}")
+    print("    Issuer (quien lo emitio):")
+    for attr in cert.issuer:
+        print(f"      {attr.oid._name}: {attr.value}")
+    print(f"    Valido desde: {cert.not_valid_before_utc}")
+    print(f"    Valido hasta: {cert.not_valid_after_utc}")
+except Exception as e:
+    print(f"    ERROR - {type(e).__name__}: {e}")
+
 print("\n" + "=" * 55)
 print("  Prueba completada")
 print("=" * 55)
