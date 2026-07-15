@@ -1,0 +1,41 @@
+# Dependencias para el Sistema de Facturación Electrónica SIFEN Paraguay
+# Versión: 1.0.0
+
+# XML Processing y Firma Digital
+lxml==5.1.0
+xmlsec==1.3.13
+signxml==3.2.2
+pyOpenSSL==24.0.0
+cryptography==42.0.5
+
+# Cliente SOAP y HTTP
+zeep==4.2.1
+requests==2.31.0
+urllib3==2.2.1
+
+# Generación de PDF (KuDE)
+reportlab==4.1.0
+qrcode==7.4.2
+Pillow==10.2.0
+
+# Utilidades de fecha/hora
+python-dateutil==2.8.2
+pytz==2024.1
+
+# Validación de datos
+pydantic==2.6.4
+
+# Logging mejorado
+loguru==0.7.2
+
+# Base de datos (opcional para persistencia)
+SQLAlchemy==2.0.28
+
+# Testing
+pytest==8.1.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Formato de código
+black==24.3.0
+flake8==7.0.0
