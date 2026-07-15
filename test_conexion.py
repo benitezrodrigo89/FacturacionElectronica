@@ -66,15 +66,33 @@ try:
         verify=False,
         timeout=15,
     )
+    print(f"    HTTP Status: {r.status_code}")
+    print(f"    Bytes recibidos: {len(r.content)}")
+    print(f"    Headers: {dict(r.headers)}")
     if r.status_code == 200 and len(r.content) > 0:
         print(f"    OK - Servidor responde ({len(r.content)} bytes)")
+        print(f"    Primeros 200 chars: {r.text[:200]}")
     elif r.status_code == 200 and len(r.content) == 0:
         print(f"    ADVERTENCIA - Servidor responde pero cuerpo vacio")
         print(f"    Esto puede indicar IP bloqueada o certificado rechazado")
     else:
         print(f"    ERROR - HTTP {r.status_code}")
+        print(f"    Respuesta: {r.text[:300]}")
 except Exception as e:
-    print(f"    ERROR - No se pudo conectar: {e}")
+    print(f"    ERROR - No se pudo conectar: {type(e).__name__}: {e}")
+
+# 3b. Prueba sin certificado (solo para comparar)
+print("\n[3b] Probando sin certificado (solo conectividad)...")
+try:
+    import requests
+    r2 = requests.get(
+        'https://sifen-test.set.gov.py/de/ws/consultas/consulta-ruc.wsdl',
+        verify=False,
+        timeout=15,
+    )
+    print(f"    HTTP Status sin cert: {r2.status_code} — {len(r2.content)} bytes")
+except Exception as e:
+    print(f"    ERROR sin cert: {type(e).__name__}: {e}")
 
 print("\n" + "=" * 55)
 print("  Prueba completada")
