@@ -12,8 +12,13 @@ sys.path.insert(0, 'sifen_py')
 CERT_PATH = 'certificado_sifen.pfx'
 CERT_PASSWORD = 'ferreteria2026.'
 RUC = '5722781-0'
-CSC = 'F106BB559CA81685185B8ea5082e46A1'
-TIMBRADO = '18934267'
+
+# Datos especificos para ambiente de PRUEBAS (Guia de Pruebas e-kuatia, seccion 2)
+# El timbrado de test es el RUC sin DV con un 0 al inicio
+# El CSC de test es el generico provisto por la DNIT (NO el de produccion)
+CSC_TEST_ID = '0001'
+CSC = 'ABCD00000000000000000000000000000'
+TIMBRADO = '05722781'
 
 print("=" * 55)
 print("  TEST DE CONEXION SIFEN PARAGUAY")
@@ -43,6 +48,8 @@ try:
         csc=CSC,
         timbrado_numero=TIMBRADO,
     )
+    print(f"    CSC test:    {CSC}")
+    print(f"    Timbrado test: {TIMBRADO}")
     signer = XMLSigner(config)
     info = signer.get_certificate_info()
     print(f"    OK - Titular: {info['subject'].get('commonName')}")
@@ -118,5 +125,6 @@ print("  Prueba completada")
 print("=" * 55)
 print(f"\nDatos configurados:")
 print(f"  RUC:      {RUC}")
-print(f"  Timbrado: {TIMBRADO}")
+print(f"  Timbrado: {TIMBRADO}  (RUC sin DV con 0 al inicio)")
+print(f"  CSC:      {CSC}  (generico DNIT para test)")
 print(f"  Ambiente: TEST")
