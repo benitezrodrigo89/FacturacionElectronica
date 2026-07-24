@@ -82,7 +82,7 @@ def main():
         "timbradoNumero": TIMBRADO,
         "timbradoFecha": TIMBRADO_FECHA,
         "actividadesEconomicas": [
-            {"codigo": "46900", "descripcion": "Comercio al por mayor"}
+            {"codigo": "47521", "descripcion": "Comercio al por menor de articulos de ferreteria"}
         ],
         "tipoContribuyente": 2,
         "tipoRegimen": 8,
