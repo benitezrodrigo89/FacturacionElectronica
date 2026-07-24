@@ -112,19 +112,24 @@ class XMLSigner:
 
     def firmar_xml(self, xml_string: Union[str, bytes]) -> str:
         """
-        Firma un XML con el certificado digital
+        Firma un XML con el certificado digital según XMLDSig Enveloped Signature.
+
+        Algoritmo (Manual Técnico SIFEN v150 sección 7.6):
+          1. DigestValue = SHA256(exc-C14N(elemento <DE>))
+          2. Construir Signature y anexar al <rDE>
+          3. Canonicalizar SignedInfo DENTRO del documento para heredar namespaces
+          4. SignatureValue = RSA-SHA256(inc-C14N(SignedInfo-en-contexto))
 
         Args:
             xml_string: XML a firmar (string o bytes)
 
         Returns:
-            XML firmado como string
-
-        Raises:
-            SignatureException: Si hay error en la firma
+            XML firmado sin declaración XML ni whitespace entre etiquetas
         """
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding
+
         try:
-            # Parsear el XML
             if isinstance(xml_string, str):
                 xml_string = xml_string.encode('utf-8')
 
@@ -132,142 +137,91 @@ class XMLSigner:
 
             logger.info("Iniciando proceso de firma digital...")
 
-            # Crear el elemento Signature
-            signature_elem = self._create_signature_element(root)
+            sifen_ns = "http://ekuatia.set.gov.py/sifen/xsd"
+            ds_ns    = "http://www.w3.org/2000/09/xmldsig#"
 
-            # Insertar la firma en el XML (antes del cierre del elemento raíz)
-            root.append(signature_elem)
+            # ── 1. Localizar <DE> y obtener el CDC ───────────────────────────
+            de_elem = root.find('{%s}DE' % sifen_ns)
+            if de_elem is None:
+                raise SignatureException("No se encontró el elemento <DE> en el XML")
+            cdc = de_elem.get('Id', '')
 
-            # Convertir a string
-            xml_firmado = etree.tostring(
-                root,
-                pretty_print=True,
-                xml_declaration=True,
-                encoding='UTF-8'
-            ).decode('utf-8')
+            # ── 2. DigestValue sobre <DE> con C14N exclusivo ─────────────────
+            # Transforms declarados: enveloped-signature (no-op) + exc-C14N
+            de_c14n = etree.tostring(de_elem, method='c14n', exclusive=True)
+            digest_b64 = base64.b64encode(hashlib.sha256(de_c14n).digest()).decode()
+
+            # ── 3. Construir estructura Signature (SignatureValue vacío) ──────
+            nsmap     = {None: ds_ns}
+            signature = etree.Element("{%s}Signature" % ds_ns, nsmap=nsmap)
+
+            signed_info = etree.SubElement(signature, "{%s}SignedInfo" % ds_ns)
+
+            etree.SubElement(signed_info, "{%s}CanonicalizationMethod" % ds_ns,
+                             Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
+            etree.SubElement(signed_info, "{%s}SignatureMethod" % ds_ns,
+                             Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256")
+
+            reference = etree.SubElement(signed_info, "{%s}Reference" % ds_ns,
+                                         URI='#' + cdc)
+            transforms = etree.SubElement(reference, "{%s}Transforms" % ds_ns)
+            etree.SubElement(transforms, "{%s}Transform" % ds_ns,
+                             Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature")
+            etree.SubElement(transforms, "{%s}Transform" % ds_ns,
+                             Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
+
+            etree.SubElement(reference, "{%s}DigestMethod" % ds_ns,
+                             Algorithm="http://www.w3.org/2001/04/xmlenc#sha256")
+            dv_elem = etree.SubElement(reference, "{%s}DigestValue" % ds_ns)
+            dv_elem.text = digest_b64
+
+            sig_value_elem = etree.SubElement(signature, "{%s}SignatureValue" % ds_ns)
+
+            key_info  = etree.SubElement(signature, "{%s}KeyInfo" % ds_ns)
+            x509_data = etree.SubElement(key_info,  "{%s}X509Data" % ds_ns)
+            x509_cert = etree.SubElement(x509_data, "{%s}X509Certificate" % ds_ns)
+            cert_pem  = self.certificate.public_bytes(serialization.Encoding.PEM)
+            cert_b64  = (cert_pem.decode()
+                         .replace('-----BEGIN CERTIFICATE-----', '')
+                         .replace('-----END CERTIFICATE-----', '')
+                         .replace('\n', ''))
+            x509_cert.text = cert_b64
+
+            # ── 4. Insertar Signature y gCamFuFD en el árbol ANTES de firmar ──
+            # Ambos elementos deben estar en el árbol cuando se canonicaliza
+            # SignedInfo, para que SIFEN compute la misma C14N al verificar.
+            root.append(signature)
+
+            gcam = etree.SubElement(root, "{%s}gCamFuFD" % sifen_ns)
+            dcar = etree.SubElement(gcam, "{%s}dCarQR" % sifen_ns)
+            dcar.text = self._generar_car_qr(de_elem, cdc)
+
+            # ── 5. Canonicalizar SignedInfo con exclusive C14N ────────────────
+            # Exclusive C14N evita herencia de xmlns:xsi del padre <rDE>
+            si_in_doc = root.find('.//{%s}SignedInfo' % ds_ns)
+            signed_info_c14n = etree.tostring(si_in_doc, method='c14n', exclusive=True)
+
+            # ── 6. Firmar y fijar SignatureValue ─────────────────────────────
+            sig_bytes = self.private_key.sign(
+                signed_info_c14n,
+                padding.PKCS1v15(),
+                hashes.SHA256()
+            )
+            sig_value_elem.text = base64.b64encode(sig_bytes).decode()
+
+            # Sin declaración XML ni whitespace (Manual Técnico sección 7.2.4)
+            xml_firmado = etree.tostring(root, pretty_print=False, encoding='unicode')
 
             logger.success("XML firmado exitosamente")
             return xml_firmado
 
         except etree.XMLSyntaxError as e:
-            raise SignatureException(
-                f"XML inválido: {str(e)}",
-                code="INVALID_XML"
-            )
+            raise SignatureException(f"XML inválido: {str(e)}", code="INVALID_XML")
+        except SignatureException:
+            raise
         except Exception as e:
             logger.exception("Error al firmar XML")
-            raise SignatureException(
-                f"Error al firmar el XML: {str(e)}",
-                code="SIGNATURE_ERROR"
-            )
-
-    def _create_signature_element(self, root: etree.Element) -> etree.Element:
-        """
-        Crea el elemento Signature según XMLDSig
-
-        Args:
-            root: Elemento raíz del XML a firmar
-
-        Returns:
-            Elemento Signature completo
-        """
-        # Namespaces
-        ds_ns = "http://www.w3.org/2000/09/xmldsig#"
-        nsmap = {None: ds_ns}
-
-        # Crear elemento Signature
-        signature = etree.Element("{%s}Signature" % ds_ns, nsmap=nsmap)
-
-        # SignedInfo
-        signed_info = etree.SubElement(signature, "{%s}SignedInfo" % ds_ns)
-
-        # CanonicalizationMethod
-        canonicalization = etree.SubElement(
-            signed_info,
-            "{%s}CanonicalizationMethod" % ds_ns,
-            Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
-        )
-
-        # SignatureMethod
-        signature_method = etree.SubElement(
-            signed_info,
-            "{%s}SignatureMethod" % ds_ns,
-            Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
-        )
-
-        # Reference
-        reference = etree.SubElement(
-            signed_info,
-            "{%s}Reference" % ds_ns,
-            URI=""
-        )
-
-        # Transforms
-        transforms = etree.SubElement(reference, "{%s}Transforms" % ds_ns)
-        transform1 = etree.SubElement(
-            transforms,
-            "{%s}Transform" % ds_ns,
-            Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"
-        )
-
-        # DigestMethod
-        digest_method = etree.SubElement(
-            reference,
-            "{%s}DigestMethod" % ds_ns,
-            Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"
-        )
-
-        # Calcular DigestValue
-        # Canonicalizar el documento sin la firma
-        canonicalized = etree.tostring(
-            root,
-            method='c14n',
-            exclusive=False
-        )
-        digest = hashlib.sha256(canonicalized).digest()
-        digest_b64 = base64.b64encode(digest).decode()
-
-        digest_value = etree.SubElement(reference, "{%s}DigestValue" % ds_ns)
-        digest_value.text = digest_b64
-
-        # SignatureValue (se calculará después)
-        signature_value = etree.SubElement(signature, "{%s}SignatureValue" % ds_ns)
-
-        # Calcular la firma del SignedInfo
-        signed_info_canonical = etree.tostring(
-            signed_info,
-            method='c14n',
-            exclusive=False
-        )
-
-        # Firmar con la clave privada
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.asymmetric import padding
-
-        signature_bytes = self.private_key.sign(
-            signed_info_canonical,
-            padding.PKCS1v15(),
-            hashes.SHA256()
-        )
-
-        signature_value.text = base64.b64encode(signature_bytes).decode()
-
-        # KeyInfo
-        key_info = etree.SubElement(signature, "{%s}KeyInfo" % ds_ns)
-        x509_data = etree.SubElement(key_info, "{%s}X509Data" % ds_ns)
-        x509_certificate = etree.SubElement(x509_data, "{%s}X509Certificate" % ds_ns)
-
-        # Exportar el certificado en formato PEM y codificarlo
-        from cryptography.hazmat.primitives import serialization
-        cert_pem = self.certificate.public_bytes(serialization.Encoding.PEM)
-        # Remover headers y newlines
-        cert_b64 = cert_pem.decode().replace('-----BEGIN CERTIFICATE-----', '')
-        cert_b64 = cert_b64.replace('-----END CERTIFICATE-----', '')
-        cert_b64 = cert_b64.replace('\n', '')
-
-        x509_certificate.text = cert_b64
-
-        return signature
+            raise SignatureException(f"Error al firmar el XML: {str(e)}", code="SIGNATURE_ERROR")
 
     def verificar_firma(self, xml_firmado: Union[str, bytes]) -> bool:
         """
@@ -302,6 +256,53 @@ class XMLSigner:
         except Exception as e:
             logger.error(f"Error al verificar firma: {str(e)}")
             return False
+
+    def _generar_car_qr(self, de_elem, cdc: str) -> str:
+        """
+        Genera la cadena dCarQR (campo J002) según Manual Técnico SIFEN v150 sección 13.4.4.
+        Formato: URL_BASE?nVersion=150&Id=CDC&dFeEmiDE=...&dRucRec=...&dTotGralOpe=...&dDesTipTra=...&id=CDC&dDVId=DV&nIdCSC=CSCID&dCSC=CSC&hmac=SHA256(params+CSC)
+        """
+        sifen_ns = "http://ekuatia.set.gov.py/sifen/xsd"
+
+        def _txt(xpath):
+            el = de_elem.find('.//{%s}%s' % (sifen_ns, xpath))
+            return el.text.strip() if el is not None and el.text else ''
+
+        url_base = (
+            'https://ekuatia.set.gov.py/consultas-test/'
+            if self.config.ambiente == 'test'
+            else 'https://ekuatia.set.gov.py/consultas/'
+        )
+
+        dv_id   = cdc[-1] if cdc else '0'
+        fe_emi  = _txt('dFeEmiDE')
+        ruc_rec = _txt('dRucRec')
+        if not ruc_rec:
+            dv_rec  = _txt('dDVRec')
+            ruc_rec_raw = _txt('dRucRec') or ''
+            ruc_rec = (ruc_rec_raw + '-' + dv_rec) if dv_rec else ruc_rec_raw
+        tot_gral = _txt('dTotGralOpe')
+        tip_tra  = _txt('dDesTipTra')
+
+        csc_id  = getattr(self.config, 'csc_id', '0001')
+        csc_val = getattr(self.config, 'csc', '')
+
+        params = (
+            f"nVersion=150"
+            f"&Id={cdc}"
+            f"&dFeEmiDE={fe_emi}"
+            f"&dRucRec={ruc_rec}"
+            f"&dTotGralOpe={tot_gral}"
+            f"&dDesTipTra={tip_tra}"
+            f"&id={cdc}"
+            f"&dDVId={dv_id}"
+            f"&nIdCSC={csc_id}"
+        )
+
+        hmac_input = params + csc_val
+        hmac_val   = hashlib.sha256(hmac_input.encode('utf-8')).hexdigest().upper()
+
+        return url_base + '?' + params + f"&dCSC={csc_val}&hmac={hmac_val}"
 
     def get_certificate_info(self) -> dict:
         """

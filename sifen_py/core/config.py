@@ -44,6 +44,7 @@ class SifenConfig:
         email: Optional[str] = None,
         timbrado_numero: str = '00000000',
         timbrado_fecha: Optional[str] = None,
+        csc_id: str = '0001',
     ):
         # Validar ambiente
         if ambiente not in [AMBIENTE_TEST, AMBIENTE_PRODUCCION]:
@@ -68,6 +69,7 @@ class SifenConfig:
         self.telefono = telefono
         self.email = email
         self.timbrado_numero = str(timbrado_numero).zfill(8)[:8]
+        self.csc_id = str(csc_id).zfill(4)
         from datetime import datetime
         self.timbrado_fecha = timbrado_fecha or datetime.now().strftime('%Y-%m-%d')
 

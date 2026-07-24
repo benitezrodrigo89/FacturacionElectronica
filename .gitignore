@@ -15,3 +15,20 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Certificados digitales — nunca subir al repo
+*.pfx
+*.p12
+*.pem
+*.key
+
+# XMLs de prueba generados localmente
+soap_v*.xml
+de_firmado_debug.xml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
