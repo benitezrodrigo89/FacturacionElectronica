@@ -85,10 +85,16 @@ def mock_soap_client():
 def xml_de_simple():
     """XML mínimo con estructura válida para pruebas de firma."""
     return """<?xml version="1.0" encoding="UTF-8"?>
-<rDE xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-    <DE>
+<rDE xmlns="http://ekuatia.set.gov.py/sifen/xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://ekuatia.set.gov.py/sifen/xsd siRecepDE_v150.xsd">
+    <dVerFor>150</dVerFor>
+    <DE Id="01080069563001001000000120260115000000000018">
+        <dDVId>8</dDVId>
+        <dFecFirma>2026-01-15T10:30:00</dFecFirma>
+        <dSisFact>1</dSisFact>
         <gOpeDE>
             <iTipEmi>1</iTipEmi>
+            <dDesTipEmi>Normal</dDesTipEmi>
+            <dCodSeg>000000001</dCodSeg>
         </gOpeDE>
         <gTimb>
             <iTiDE>1</iTiDE>
@@ -96,6 +102,18 @@ def xml_de_simple():
         </gTimb>
         <gDatGralOpe>
             <dFeEmiDE>2026-01-15T10:30:00</dFeEmiDE>
+            <gOpeCom>
+                <iTipTra>1</iTipTra>
+                <dDesTipTra>Venta de mercadería</dDesTipTra>
+            </gOpeCom>
+            <gDatRec>
+                <dRucRec>80069563</dRucRec>
+                <dDVRec>1</dDVRec>
+            </gDatRec>
         </gDatGralOpe>
+        <gTotSub>
+            <dTotGralOpe>100000</dTotGralOpe>
+            <dTotIVA>9091</dTotIVA>
+        </gTotSub>
     </DE>
 </rDE>"""

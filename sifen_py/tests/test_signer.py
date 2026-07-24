@@ -140,12 +140,12 @@ class TestFirmarXml:
         resultado = signer.firmar_xml(xml_de_simple)
         root = etree.fromstring(resultado.encode())
         # El elemento raíz del XML original debe seguir presente
-        assert root.tag == 'rDE'
+        assert 'rDE' in root.tag
 
     def test_algoritmo_canonicalizacion_correcto(self, config_test, xml_de_simple):
         signer = _build_signer(config_test)
         resultado = signer.firmar_xml(xml_de_simple)
-        assert 'xml-c14n-20010315' in resultado
+        assert 'xml-exc-c14n' in resultado
 
     def test_algoritmo_firma_rsa_sha256(self, config_test, xml_de_simple):
         signer = _build_signer(config_test)
