@@ -13,6 +13,7 @@ URLs de test:
 import zipfile
 import io
 import time
+from lxml import etree
 from typing import Optional
 from pathlib import Path
 from loguru import logger
@@ -88,6 +89,12 @@ class SifenSOAPClient:
         'prod': 'https://sifen.set.gov.py/de/ws/sync/recibe.wsdl',
     }
 
+    # Endpoints HTTP directos (sin WSDL) — misma URL sin .wsdl
+    URLS_ENDPOINT = {
+        'test': 'https://sifen-test.set.gov.py/de/ws/sync/recibe',
+        'prod': 'https://sifen.set.gov.py/de/ws/sync/recibe',
+    }
+
     def __init__(self, config: SifenConfig, timeout: int = 60):
         if not ZEEP_AVAILABLE:
             raise SOAPException(
@@ -143,7 +150,125 @@ class SifenSOAPClient:
         return client
 
     # ─────────────────────────────────────────────────────────
-    # 1. RECEPCIÓN SÍNCRONA (1 documento)
+    # 1. RECEPCIÓN SÍNCRONA DIRECTA (sin WSDL, HTTP POST puro)
+    # ─────────────────────────────────────────────────────────
+    def enviar_de_directo(self, xml_firmado: str) -> RespuestaSIFEN:
+        """
+        Envía un DE firmado construyendo el envelope SOAP manualmente y
+        enviándolo vía HTTP POST con mTLS, sin necesitar cargar el WSDL.
+
+        Útil cuando el WSDL no es accesible desde la IP actual.
+
+        Args:
+            xml_firmado: XML del rDE firmado (sin envelope SOAP)
+
+        Returns:
+            RespuestaSIFEN con el resultado
+        """
+
+        # Construir envelope con lxml para que el rDE quede como nodo real
+        env_ns  = 'http://www.w3.org/2003/05/soap-envelope'
+        sif_ns  = 'http://ekuatia.set.gov.py/sifen/xsd'
+
+        envelope_elem = etree.Element('{%s}Envelope' % env_ns, nsmap={'env': env_ns})
+        etree.SubElement(envelope_elem, '{%s}Header' % env_ns)
+        body      = etree.SubElement(envelope_elem, '{%s}Body' % env_ns)
+        renvide   = etree.SubElement(body, '{%s}rEnviDe' % sif_ns, nsmap={None: sif_ns})
+        did       = etree.SubElement(renvide, '{%s}dId' % sif_ns)
+        did.text  = '1'
+        xde       = etree.SubElement(renvide, '{%s}xDE' % sif_ns)
+
+        # Parsear el rDE firmado e insertarlo como nodo hijo de xDE
+        rde_root  = etree.fromstring(xml_firmado.encode('utf-8'))
+        xde.append(rde_root)
+
+        envelope = etree.tostring(envelope_elem, xml_declaration=True,
+                                  encoding='UTF-8', pretty_print=False)
+
+        url     = self.URLS_ENDPOINT[self.config.ambiente]
+        session = self._get_session()
+        headers = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+
+        logger.info(f"Enviando DE directo a: {url}")
+        try:
+            resp = session.post(
+                url,
+                data=envelope,
+                headers=headers,
+                timeout=self.timeout,
+            )
+        except Exception as e:
+            raise SOAPException(f"Error HTTP al enviar DE: {e}") from e
+
+        if resp.status_code not in (200, 400, 500):
+            resp.raise_for_status()
+
+        # SIFEN devuelve 400/500 con un envelope SOAP de error — parsearlo igual
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+
+        return self._parsear_respuesta_xml(resp.content)
+
+    def enviar_soap_bytes(self, soap_bytes: bytes) -> RespuestaSIFEN:
+        """
+        Envía un envelope SOAP ya construido (bytes crudos) sin modificarlo.
+        Preserva la firma digital intacta.
+
+        Args:
+            soap_bytes: Contenido completo del archivo SOAP listo para enviar
+
+        Returns:
+            RespuestaSIFEN con el resultado
+        """
+        url     = self.URLS_ENDPOINT[self.config.ambiente]
+        session = self._get_session()
+        headers = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+
+        logger.info(f"Enviando SOAP bytes a: {url} ({len(soap_bytes)} bytes)")
+        try:
+            resp = session.post(
+                url,
+                data=soap_bytes,
+                headers=headers,
+                timeout=self.timeout,
+            )
+        except Exception as e:
+            raise SOAPException(f"Error HTTP: {e}") from e
+
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        return self._parsear_respuesta_xml(resp.content)
+
+    def _parsear_respuesta_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:
+        """Parsea la respuesta SOAP XML de SIFEN directamente."""
+        try:
+            root   = etree.fromstring(xml_bytes)
+            ns     = 'http://ekuatia.set.gov.py/sifen/xsd'
+            codigo = ''
+            desc   = ''
+            prot   = root.find('.//{%s}rProtDe' % ns)
+            if prot is not None:
+                est    = prot.find('{%s}dEstRes' % ns)
+                respr  = prot.find('.//{%s}dCodRes' % ns)
+                msgr   = prot.find('.//{%s}dMsgRes' % ns)
+                prot_a = prot.find('{%s}dProtAut' % ns)
+                codigo = respr.text.strip() if respr is not None else ''
+                desc   = msgr.text.strip()  if msgr  is not None else ''
+                if prot_a is not None:
+                    logger.success(f"Protocolo de autorización: {prot_a.text.strip()}")
+            resp = RespuestaSIFEN(codigo, desc, {'xml': xml_bytes.decode('utf-8', errors='replace')})
+            logger.info(f"Respuesta SIFEN: {resp}")
+            return resp
+        except Exception as e:
+            logger.error(f"Error parseando respuesta XML: {e}")
+            return RespuestaSIFEN('ERR', str(e), {})
+
+    # ─────────────────────────────────────────────────────────
+    # 1b. RECEPCIÓN SÍNCRONA vía WSDL/zeep
     # ─────────────────────────────────────────────────────────
     def recibir_de(self, xml_firmado: str) -> RespuestaSIFEN:
         """

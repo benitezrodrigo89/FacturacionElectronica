@@ -194,7 +194,7 @@ class XMLSigner:
 
             gcam = etree.SubElement(root, "{%s}gCamFuFD" % sifen_ns)
             dcar = etree.SubElement(gcam, "{%s}dCarQR" % sifen_ns)
-            dcar.text = self._generar_car_qr(de_elem, cdc)
+            dcar.text = self._generar_car_qr(de_elem, cdc, digest_b64)
 
             # ── 5. Canonicalizar SignedInfo con exclusive C14N ────────────────
             # Exclusive C14N evita herencia de xmlns:xsi del padre <rDE>
@@ -257,10 +257,11 @@ class XMLSigner:
             logger.error(f"Error al verificar firma: {str(e)}")
             return False
 
-    def _generar_car_qr(self, de_elem, cdc: str) -> str:
+    def _generar_car_qr(self, de_elem, cdc: str, digest_value_b64: str) -> str:
         """
-        Genera la cadena dCarQR (campo J002) según Manual Técnico SIFEN v150 sección 13.4.4.
-        Formato: URL_BASE?nVersion=150&Id=CDC&dFeEmiDE=...&dRucRec=...&dTotGralOpe=...&dDesTipTra=...&id=CDC&dDVId=DV&nIdCSC=CSCID&dCSC=CSC&hmac=SHA256(params+CSC)
+        Genera dCarQR (campo J002) según Manual Técnico SIFEN v150 sección 13.8.
+        Parámetros: nVersion, Id, dFeEmiDE(hex), dRucRec, dTotGralOpe, dTotIVA,
+                    cItems, DigestValue(hex), IdCSC → SHA256(params + CSC) = cHashQR
         """
         sifen_ns = "http://ekuatia.set.gov.py/sifen/xsd"
 
@@ -268,41 +269,42 @@ class XMLSigner:
             el = de_elem.find('.//{%s}%s' % (sifen_ns, xpath))
             return el.text.strip() if el is not None and el.text else ''
 
+        def _to_hex(s: str) -> str:
+            return s.encode('utf-8').hex()
+
         url_base = (
-            'https://ekuatia.set.gov.py/consultas-test/'
+            'https://ekuatia.set.gov.py/consultas-test/qr?'
             if self.config.ambiente == 'test'
-            else 'https://ekuatia.set.gov.py/consultas/'
+            else 'https://ekuatia.set.gov.py/consultas/qr?'
         )
 
-        dv_id   = cdc[-1] if cdc else '0'
-        fe_emi  = _txt('dFeEmiDE')
-        ruc_rec = _txt('dRucRec')
-        if not ruc_rec:
-            dv_rec  = _txt('dDVRec')
-            ruc_rec_raw = _txt('dRucRec') or ''
-            ruc_rec = (ruc_rec_raw + '-' + dv_rec) if dv_rec else ruc_rec_raw
-        tot_gral = _txt('dTotGralOpe')
-        tip_tra  = _txt('dDesTipTra')
-
-        csc_id  = getattr(self.config, 'csc_id', '0001')
-        csc_val = getattr(self.config, 'csc', '')
+        fe_emi_hex     = _to_hex(_txt('dFeEmiDE'))
+        ruc_rec        = _txt('dRucRec') or '0'
+        tot_gral       = _txt('dTotGralOpe') or '0'
+        tot_iva        = _txt('dTotIVA') or '0'
+        # Contar ítems: cantidad de elementos dCodInt (uno por ítem)
+        c_items        = str(len(de_elem.findall('.//{%s}gCamItem' % sifen_ns)))
+        digest_hex     = digest_value_b64.encode('utf-8').hex()
+        csc_id         = getattr(self.config, 'csc_id', '0001')
+        csc_val        = getattr(self.config, 'csc', '')
 
         params = (
             f"nVersion=150"
             f"&Id={cdc}"
-            f"&dFeEmiDE={fe_emi}"
+            f"&dFeEmiDE={fe_emi_hex}"
             f"&dRucRec={ruc_rec}"
             f"&dTotGralOpe={tot_gral}"
-            f"&dDesTipTra={tip_tra}"
-            f"&id={cdc}"
-            f"&dDVId={dv_id}"
-            f"&nIdCSC={csc_id}"
+            f"&dTotIVA={tot_iva}"
+            f"&cItems={c_items}"
+            f"&DigestValue={digest_hex}"
+            f"&IdCSC={csc_id}"
         )
 
-        hmac_input = params + csc_val
-        hmac_val   = hashlib.sha256(hmac_input.encode('utf-8')).hexdigest().upper()
+        # CSC se concatena directamente sin "&" ni nombre de parámetro
+        hash_input = params + csc_val
+        c_hash_qr  = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
 
-        return url_base + '?' + params + f"&dCSC={csc_val}&hmac={hmac_val}"
+        return url_base + params + f"&cHashQR={c_hash_qr}"
 
     def get_certificate_info(self) -> dict:
         """

@@ -28,11 +28,11 @@ RAZON_SOCIAL   = 'AMARILLA ORTIZ OSVALDO MATHIAS ANTONIO'
 NOMBRE_FANTASIA = 'AMARILLA ORTIZ'
 TIMBRADO       = '05722781'
 TIMBRADO_FECHA = '2026-06-02'   # Fecha de inicio de vigencia en Marangatu
-CSC            = 'ABCD00000000000000000000000000000'
+CSC            = 'ABCD0000000000000000000000000000'
 CSC_ID         = '0001'
 
 # Número de documento — incrementar manualmente en cada prueba
-NUMERO_DOC = 56
+NUMERO_DOC = 73
 
 # Código de seguridad aleatorio de 9 dígitos — cambiar en cada envío
 CODIGO_SEGURIDAD = '123456789'
@@ -82,7 +82,7 @@ def main():
         "timbradoNumero": TIMBRADO,
         "timbradoFecha": TIMBRADO_FECHA,
         "actividadesEconomicas": [
-            {"codigo": "47521", "descripcion": "Comercio al por menor de articulos de ferreteria"}
+            {"codigo": "47521", "descripcion": "COMERCIO AL POR MENOR DE ARTÍCULOS DE FERRETERÍA"}
         ],
         "tipoContribuyente": 2,
         "tipoRegimen": 8,
@@ -119,9 +119,9 @@ def main():
         "moneda": "PYG",
         "cliente": {
             "contribuyente": True,
-            "ruc": "2005001-1",
-            "razonSocial": "CLIENTE SA",
-            "nombreFantasia": "CLIENTE SA",
+            "ruc": "5722781-0",
+            "razonSocial": "AMARILLA ORTIZ OSVALDO MATHIAS ANTONIO",
+            "nombreFantasia": "AMARILLA ORTIZ",
             "tipoOperacion": 1,
             "direccion": "Asuncion",
             "numeroCasa": "1",
@@ -133,11 +133,11 @@ def main():
             "ciudadDescripcion": "ASUNCION (DISTRITO)",
             "pais": "PRY",
             "paisDescripcion": "Paraguay",
-            "tipoContribuyente": 1,
+            "tipoContribuyente": 2,
             "documentoTipo": 1,
-            "documentoNumero": "2324234",
-            "telefono": "0981000001",
-            "email": "cliente@cliente.com"
+            "documentoNumero": "5722781",
+            "telefono": "0981000000",
+            "email": "empresa@empresa.com"
         },
         "usuario": {
             "documentoTipo": 1,
@@ -203,7 +203,7 @@ def main():
     cdc = m_cdc.group(1) if m_cdc else 'NO ENCONTRADO'
     print(f"    CDC: {cdc}")
 
-    # 7. Construir envelope SOAP
+    # 7. Construir envelope SOAP y guardar archivo
     print("\n[3] Construyendo envelope SOAP...")
     soap = (
         '<?xml version="1.0" encoding="UTF-8"?>'
@@ -217,20 +217,26 @@ def main():
         '</env:Body>'
         '</env:Envelope>'
     )
-
-    # 8. Guardar archivo
     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
         f.write(soap)
-
     print(f"    OK — guardado en: {OUTPUT_FILE}")
 
+    # 8. Enviar a SIFEN directamente desde Python
+    print("\n[4] Enviando a SIFEN...")
+    from sifen_py.services.soap_client import SifenSOAPClient
+    client = SifenSOAPClient(config)
+    # Enviar el archivo generado tal cual — sin re-parsear (preserva la firma)
+    with open(OUTPUT_FILE, 'rb') as f:
+        soap_bytes = f.read()
+    respuesta = client.enviar_soap_bytes(soap_bytes)
+
     print("\n" + "=" * 55)
-    print(f"  Archivo listo: {OUTPUT_FILE}")
-    print(f"  CDC: {cdc}")
+    print(f"  CDC:      {cdc}")
+    print(f"  Código:   {respuesta.codigo}")
+    print(f"  Estado:   {respuesta.descripcion}")
+    if respuesta.codigo == '0260':
+        print("  *** APROBADO ***")
     print("=" * 55)
-    print("\nIMPORTANTE: En SoapUI cargar con:")
-    print("  File -> Load Request from File")
-    print("  NO usar copiar y pegar (rompe la firma)")
 
 
 if __name__ == '__main__':
