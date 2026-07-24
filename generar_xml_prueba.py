@@ -32,7 +32,7 @@ CSC            = 'ABCD0000000000000000000000000000'
 CSC_ID         = '0001'
 
 # Número de documento — incrementar manualmente en cada prueba
-NUMERO_DOC = 74
+NUMERO_DOC = 75
 
 # Código de seguridad aleatorio de 9 dígitos — cambiar en cada envío
 CODIGO_SEGURIDAD = '456789123'
@@ -228,6 +228,8 @@ def main():
     # Enviar el archivo generado tal cual — sin re-parsear (preserva la firma)
     with open(OUTPUT_FILE, 'rb') as f:
         soap_bytes = f.read()
+    print(f"    Tamaño del envelope: {len(soap_bytes)} bytes")
+    print(f"    Primeros 120 chars: {soap_bytes[:120].decode('utf-8', errors='replace')}")
     respuesta = client.enviar_soap_bytes(soap_bytes)
 
     print("\n" + "=" * 55)
