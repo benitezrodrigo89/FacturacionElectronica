@@ -183,15 +183,15 @@ def main():
         f'.catch(e=>{{console.error(e.message);process.exit(1)}});'
     )
     r = subprocess.run(
-        ['node', '-'], input=script,
-        capture_output=True, text=True,
+        ['node', '-'], input=script.encode('utf-8'),
+        capture_output=True,
         cwd=NODE_PATH, timeout=30
     )
     if r.returncode != 0:
-        print(f"    ERROR Node.js: {r.stderr[:500]}")
+        print(f"    ERROR Node.js: {r.stderr.decode('utf-8', errors='replace')[:500]}")
         sys.exit(1)
 
-    xml_generado = r.stdout.strip()
+    xml_generado = r.stdout.decode('utf-8').strip()
     print(f"    OK — {len(xml_generado)} caracteres")
 
     # 6. Firmar XML
