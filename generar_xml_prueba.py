@@ -13,6 +13,7 @@ import json
 import subprocess
 import re
 import warnings
+from datetime import datetime
 warnings.filterwarnings('ignore')
 
 sys.path.insert(0, 'sifen_py')
@@ -32,10 +33,10 @@ CSC            = 'ABCD0000000000000000000000000000'
 CSC_ID         = '0001'
 
 # Número de documento — incrementar manualmente en cada prueba
-NUMERO_DOC = 75
+NUMERO_DOC = 76
 
 # Código de seguridad aleatorio de 9 dígitos — cambiar en cada envío
-CODIGO_SEGURIDAD = '456789123'
+CODIGO_SEGURIDAD = '567891234'
 
 NODE_PATH = 'facturacionelectronicapy-xmlgen-main'
 OUTPUT_FILE = 'soap_prueba.xml'
@@ -112,7 +113,7 @@ def main():
         "codigoSeguridadAleatorio": CODIGO_SEGURIDAD,
         "descripcion": "Factura de prueba",
         "observacion": "Prueba de envio SIFEN",
-        "fecha": "2026-07-24T10:00:00",
+        "fecha": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "tipoEmision": 1,
         "tipoTransaccion": 1,
         "tipoImpuesto": 1,
