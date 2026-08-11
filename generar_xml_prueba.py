@@ -222,21 +222,48 @@ def main():
         f.write(soap)
     print(f"    OK — guardado en: {OUTPUT_FILE}")
 
-    # 8. Enviar a SIFEN directamente desde Python
+    # 8. Enviar a SIFEN directamente desde Python (sin mTLS, igual que SoapUI)
     print("\n[4] Enviando a SIFEN...")
-    from sifen_py.services.soap_client import SifenSOAPClient
-    client = SifenSOAPClient(config)
-    # Enviar el archivo generado tal cual — sin re-parsear (preserva la firma)
+    import requests
+    import urllib3
+    urllib3.disable_warnings()
+
+    url = 'https://sifen-test.set.gov.py/de/ws/sync/recibe'
     with open(OUTPUT_FILE, 'rb') as f:
         soap_bytes = f.read()
     print(f"    Tamaño del envelope: {len(soap_bytes)} bytes")
-    print(f"    Primeros 120 chars: {soap_bytes[:120].decode('utf-8', errors='replace')}")
-    respuesta = client.enviar_soap_bytes(soap_bytes)
+
+    resp = requests.post(
+        url,
+        data=soap_bytes,
+        headers={'Content-Type': 'application/soap+xml;charset=UTF-8'},
+        verify=False,
+        timeout=60,
+    )
+    print(f"    HTTP {resp.status_code} — {len(resp.content)} bytes")
+
+    from lxml import etree
+    try:
+        root = etree.fromstring(resp.content)
+        ns   = 'http://ekuatia.set.gov.py/sifen/xsd'
+        respr  = root.find('.//{%s}dCodRes' % ns)
+        msgr   = root.find('.//{%s}dMsgRes' % ns)
+        prot_a = root.find('.//{%s}dProtAut' % ns)
+        codigo = respr.text.strip() if respr is not None else 'ERR'
+        desc   = msgr.text.strip()  if msgr  is not None else resp.text[:200]
+        prot   = prot_a.text.strip() if prot_a is not None else ''
+    except Exception:
+        codigo, desc, prot = 'ERR', resp.text[:200], ''
+
+    from collections import namedtuple
+    respuesta = namedtuple('R', ['codigo', 'descripcion', 'protocolo'])(codigo, desc, prot)
 
     print("\n" + "=" * 55)
     print(f"  CDC:      {cdc}")
     print(f"  Código:   {respuesta.codigo}")
     print(f"  Estado:   {respuesta.descripcion}")
+    if respuesta.protocolo:
+        print(f"  Protocolo:{respuesta.protocolo}")
     if respuesta.codigo == '0260':
         print("  *** APROBADO ***")
     print("=" * 55)
