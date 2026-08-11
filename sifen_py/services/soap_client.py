@@ -224,9 +224,13 @@ class SifenSOAPClient:
         """
         url     = self.URLS_ENDPOINT[self.config.ambiente]
         session = self._get_session()
+        # Deshabilitar Accept-Encoding para que el servidor no comprima la respuesta
+        session.headers.pop('Accept-Encoding', None)
         headers = {
-            'Content-Type': 'application/soap+xml;charset=UTF-8',
-            'SOAPAction':   '',
+            'Content-Type':    'application/soap+xml;charset=UTF-8',
+            'Accept-Encoding': 'identity',
+            'Accept':          'application/soap+xml',
+            'Connection':      'close',
         }
 
         logger.info(f"Enviando SOAP bytes a: {url} ({len(soap_bytes)} bytes)")
@@ -241,6 +245,7 @@ class SifenSOAPClient:
             raise SOAPException(f"Error HTTP: {e}") from e
 
         logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        logger.debug(f"Headers respuesta: {dict(resp.headers)}")
         return self._parsear_respuesta_xml(resp.content)
 
     def _parsear_respuesta_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:
