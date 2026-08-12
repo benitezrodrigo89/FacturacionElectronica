@@ -204,7 +204,7 @@ def main():
     cdc = m_cdc.group(1) if m_cdc else 'NO ENCONTRADO'
     print(f"    CDC: {cdc}")
 
-    # 7. Construir envelope SOAP y guardar archivo
+    # 7. Guardar también el envelope como string para SoapUI
     print("\n[3] Construyendo envelope SOAP...")
     soap = (
         '<?xml version="1.0" encoding="UTF-8"?>'
@@ -222,14 +222,11 @@ def main():
         f.write(soap)
     print(f"    OK — guardado en: {OUTPUT_FILE}")
 
-    # 8. Enviar a SIFEN con mTLS (certificado de cliente requerido por BIG-IP)
+    # 8. Enviar a SIFEN usando enviar_de_directo (lxml, SOAPAction vacío)
     print("\n[4] Enviando a SIFEN...")
     from sifen_py.services.soap_client import SifenSOAPClient
     client = SifenSOAPClient(config)
-    with open(OUTPUT_FILE, 'rb') as f:
-        soap_bytes = f.read()
-    print(f"    Tamaño del envelope: {len(soap_bytes)} bytes")
-    respuesta = client.enviar_soap_bytes(soap_bytes)
+    respuesta = client.enviar_de_directo(xml_firmado)
 
     print("\n" + "=" * 55)
     print(f"  CDC:      {cdc}")
