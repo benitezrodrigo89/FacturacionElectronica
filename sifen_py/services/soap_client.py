@@ -166,24 +166,22 @@ class SifenSOAPClient:
             RespuestaSIFEN con el resultado
         """
 
-        # Construir envelope con lxml para que el rDE quede como nodo real
-        env_ns  = 'http://www.w3.org/2003/05/soap-envelope'
-        sif_ns  = 'http://ekuatia.set.gov.py/sifen/xsd'
-
-        envelope_elem = etree.Element('{%s}Envelope' % env_ns, nsmap={'env': env_ns})
-        etree.SubElement(envelope_elem, '{%s}Header' % env_ns)
-        body      = etree.SubElement(envelope_elem, '{%s}Body' % env_ns)
-        renvide   = etree.SubElement(body, '{%s}rEnviDe' % sif_ns, nsmap={None: sif_ns})
-        did       = etree.SubElement(renvide, '{%s}dId' % sif_ns)
-        did.text  = '1'
-        xde       = etree.SubElement(renvide, '{%s}xDE' % sif_ns)
-
-        # Parsear el rDE firmado e insertarlo como nodo hijo de xDE
-        rde_root  = etree.fromstring(xml_firmado.encode('utf-8'))
-        xde.append(rde_root)
-
-        envelope = etree.tostring(envelope_elem, xml_declaration=True,
-                                  encoding='UTF-8', pretty_print=False)
+        # Construir envelope por concatenación para preservar el xml_firmado intacto:
+        # - mantiene xmlns explícito en rDE
+        # - mantiene entidades &#243; etc. sin re-parsear a UTF-8 literal
+        envelope_str = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            '<env:Header/>'
+            '<env:Body>'
+            '<rEnviDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<dId>1</dId>'
+            f'<xDE>{xml_firmado}</xDE>'
+            '</rEnviDe>'
+            '</env:Body>'
+            '</env:Envelope>'
+        )
+        envelope = envelope_str.encode('ascii')
 
         url     = self.URLS_ENDPOINT[self.config.ambiente]
         session = self._get_session()
