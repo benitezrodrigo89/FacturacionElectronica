@@ -102,28 +102,34 @@ class RepositorioDE:
 
         código → estado:
             0260  → aprobado
-            1001  → duplicado
+            1001  → duplicado (SIFEN ya lo tiene — significa que estaba aprobado)
             0160  → rechazado
             otros → rechazado
+
+        Regla: un registro 'aprobado' nunca se degrada a otro estado.
+        Si llega 1001 (duplicado) y ya era 'aprobado', se mantiene 'aprobado'.
         """
         estado = _codigo_a_estado(codigo)
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE documentos_electronicos SET
-                    estado                 = %(estado)s,
+                    estado = CASE
+                        WHEN estado = 'aprobado' THEN 'aprobado'
+                        ELSE %(estado)s
+                    END,
                     codigo_sifen           = %(codigo)s,
                     descripcion_sifen      = %(descripcion)s,
-                    protocolo_autorizacion = %(protocolo)s,
+                    protocolo_autorizacion = COALESCE(%(protocolo)s, protocolo_autorizacion),
                     respuesta_xml          = %(respuesta_xml)s,
                     fecha_respuesta        = NOW()
                 WHERE cdc = %(cdc)s
             """, {
-                'cdc':          cdc,
-                'estado':       estado,
-                'codigo':       codigo,
-                'descripcion':  descripcion,
-                'protocolo':    protocolo,
+                'cdc':           cdc,
+                'estado':        estado,
+                'codigo':        codigo,
+                'descripcion':   descripcion,
+                'protocolo':     protocolo,
                 'respuesta_xml': respuesta_xml,
             })
         conn.commit()
@@ -250,7 +256,7 @@ def _codigo_a_estado(codigo: str) -> str:
     """Mapea código de respuesta de envío al estado del DE."""
     return {
         '0260': 'aprobado',
-        '1001': 'duplicado',
+        '1001': 'aprobado',  # CDC duplicado = ya existe en SIFEN = estaba aprobado
     }.get(codigo, 'rechazado')
 
 
