@@ -210,7 +210,8 @@ class XMLSigner:
             sig_value_elem.text = base64.b64encode(sig_bytes).decode()
 
             # Sin declaración XML ni whitespace (Manual Técnico sección 7.2.4)
-            xml_firmado = etree.tostring(root, pretty_print=False, encoding='unicode')
+            # ASCII encoding convierte ó→&#243; etc. para compatibilidad con SoapUI/Windows
+            xml_firmado = etree.tostring(root, pretty_print=False, encoding='ASCII', xml_declaration=False).decode('ascii')
 
             logger.success("XML firmado exitosamente")
             return xml_firmado
