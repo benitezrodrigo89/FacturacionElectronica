@@ -234,6 +234,20 @@ class RepositorioDE:
             row = cur.fetchone()
         return row[0] if isinstance(row, tuple) else list(row.values())[0]
 
+    def ultimo_enviado(self) -> Optional[dict]:
+        """Devuelve el registro del último documento enviado (por fecha_envio)."""
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, cdc, numero_doc, estado, codigo_sifen,
+                       descripcion_sifen, protocolo_autorizacion,
+                       fecha_emision, fecha_envio, intentos
+                FROM documentos_electronicos
+                ORDER BY fecha_envio DESC
+                LIMIT 1
+            """)
+            return cur.fetchone()
+
     def resumen_estados(self) -> dict:
         """Devuelve conteo de documentos por estado."""
         conn = self.db.conectar()

@@ -3,10 +3,11 @@ Script para consultar el estado de un Documento Electrónico en SIFEN por CDC.
 
 Uso:
     cd FacturacionElectronica
-    python consultar_de_prueba.py
+    python consultar_de_prueba.py            <- consulta el último documento enviado
+    python consultar_de_prueba.py            <- con CDCS_A_CONSULTAR vacío = último de la BD
 
-Podés consultar cualquier CDC que hayas enviado antes.
-También podés consultar múltiples CDCs de una vez.
+Si CDCS_A_CONSULTAR está vacío, consulta automáticamente el último documento
+registrado en la base de datos. Para consultar uno específico, agregá su CDC a la lista.
 """
 import sys
 import warnings
@@ -35,11 +36,6 @@ CDCS_A_CONSULTAR = [
 
 
 def main():
-    if not CDCS_A_CONSULTAR:
-        print("ERROR: Agregá al menos un CDC en la lista CDCS_A_CONSULTAR")
-        print("       (Copiá el CDC que aparece en la salida del script generar_xml_prueba.py)")
-        sys.exit(1)
-
     import os
     if not os.path.exists(CERT_PATH):
         print(f"ERROR: No se encontró el certificado: {CERT_PATH}")
@@ -65,7 +61,7 @@ def main():
 
     client = SifenSOAPClient(config)
 
-    # Intentar conectar a BD (opcional — si no hay BD igual funciona)
+    # Conectar a BD
     db = Conexion()
     repo = None
     try:
@@ -74,11 +70,32 @@ def main():
     except Exception:
         pass
 
+    # Determinar qué CDCs consultar
+    cdcs = [c.strip() for c in CDCS_A_CONSULTAR if c.strip()]
+
+    if not cdcs:
+        # Lista vacía → consultar el último documento enviado desde la BD
+        if repo:
+            ultimo = repo.ultimo_enviado()
+            if ultimo:
+                fila = dict(ultimo) if hasattr(ultimo, 'keys') else {
+                    'cdc': ultimo[1], 'numero_doc': ultimo[2], 'estado': ultimo[3]
+                }
+                cdcs = [fila['cdc']]
+                print(f"  (Consultando último documento enviado: doc #{fila['numero_doc']})")
+            else:
+                print("ERROR: No hay documentos en la base de datos.")
+                sys.exit(1)
+        else:
+            print("ERROR: BD no disponible y CDCS_A_CONSULTAR está vacío.")
+            print("       Agregá un CDC manualmente en la lista CDCS_A_CONSULTAR.")
+            sys.exit(1)
+
     print("=" * 60)
     print("  CONSULTA DE ESTADO DE DOCUMENTOS ELECTRÓNICOS — SIFEN")
     print("=" * 60)
 
-    for cdc in CDCS_A_CONSULTAR:
+    for cdc in cdcs:
         cdc = cdc.strip()
         if not cdc:
             continue
