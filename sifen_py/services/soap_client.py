@@ -89,10 +89,22 @@ class SifenSOAPClient:
         'prod': 'https://sifen.set.gov.py/de/ws/sync/recibe.wsdl',
     }
 
-    # Endpoints HTTP directos (sin WSDL) — misma URL sin .wsdl
+    # Endpoints HTTP directos para envío
     URLS_ENDPOINT = {
         'test': 'https://sifen-test.set.gov.py/de/ws/sync/recibe.wsdl',
         'prod': 'https://sifen.set.gov.py/de/ws/sync/recibe.wsdl',
+    }
+
+    # Endpoints HTTP directos para consulta por CDC
+    URLS_CONSULTA_DE = {
+        'test': 'https://sifen-test.set.gov.py/de/ws/consultas/consulta.wsdl',
+        'prod': 'https://sifen.set.gov.py/de/ws/consultas/consulta.wsdl',
+    }
+
+    # Endpoints HTTP directos para consulta de RUC
+    URLS_CONSULTA_RUC = {
+        'test': 'https://sifen-test.set.gov.py/de/ws/consultas/consulta-ruc.wsdl',
+        'prod': 'https://sifen.set.gov.py/de/ws/consultas/consulta-ruc.wsdl',
     }
 
     def __init__(self, config: SifenConfig, timeout: int = 60):
@@ -207,6 +219,95 @@ class SifenSOAPClient:
         # SIFEN devuelve 400/500 con un envelope SOAP de error — parsearlo igual
         logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
 
+        return self._parsear_respuesta_xml(resp.content)
+
+    def consultar_de_directo(self, cdc: str) -> RespuestaSIFEN:
+        """
+        Consulta el estado de un DE por CDC usando HTTP POST directo (sin zeep).
+        Funciona aunque el WSDL no sea accesible desde la IP actual.
+
+        Códigos de respuesta:
+            0422 → DE aprobado (incluye dProtAut)
+            0420 → DE no existe o fue rechazado
+
+        Args:
+            cdc: Código de Control del Documento (44 dígitos)
+
+        Returns:
+            RespuestaSIFEN con estado, código, y número de protocolo si está aprobado
+        """
+        if not cdc or len(cdc) != 44:
+            raise SOAPException(f"CDC inválido (debe tener 44 dígitos): {cdc!r}")
+
+        envelope_str = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            '<env:Header/>'
+            '<env:Body>'
+            '<rConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<dId>1</dId>'
+            f'<dCDC>{cdc}</dCDC>'
+            '</rConsDE>'
+            '</env:Body>'
+            '</env:Envelope>'
+        )
+        envelope = envelope_str.encode('ascii')
+
+        url     = self.URLS_CONSULTA_DE[self.config.ambiente]
+        session = self._get_session()
+        headers = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+
+        logger.info(f"Consultando DE por CDC directo: {cdc[:20]}…")
+        try:
+            resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
+        except Exception as e:
+            raise SOAPException(f"Error HTTP al consultar DE: {e}") from e
+
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        return self._parsear_respuesta_consulta_de_xml(resp.content)
+
+    def consultar_ruc_directo(self, ruc: str) -> RespuestaSIFEN:
+        """
+        Consulta datos de un RUC en el registro de la SET usando HTTP POST directo.
+
+        Args:
+            ruc: RUC a consultar (con o sin guion y DV, ej: '5722781-0' o '57227810')
+
+        Returns:
+            RespuestaSIFEN con datos del contribuyente
+        """
+        ruc_limpio = ruc.replace('-', '')
+        envelope_str = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            '<env:Header/>'
+            '<env:Body>'
+            '<rConsRUC xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<dId>1</dId>'
+            f'<dRUCCons>{ruc_limpio}</dRUCCons>'
+            '</rConsRUC>'
+            '</env:Body>'
+            '</env:Envelope>'
+        )
+        envelope = envelope_str.encode('ascii')
+
+        url     = self.URLS_CONSULTA_RUC[self.config.ambiente]
+        session = self._get_session()
+        headers = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+
+        logger.info(f"Consultando RUC directo: {ruc}")
+        try:
+            resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
+        except Exception as e:
+            raise SOAPException(f"Error HTTP al consultar RUC: {e}") from e
+
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
         return self._parsear_respuesta_xml(resp.content)
 
     def enviar_soap_bytes(self, soap_bytes: bytes) -> RespuestaSIFEN:
@@ -514,6 +615,55 @@ class SifenSOAPClient:
                 zf.writestr(filename, xml.encode('utf-8'))
         buffer.seek(0)
         return buffer.read()
+
+    def _parsear_respuesta_consulta_de_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:
+        """
+        Parsea la respuesta SOAP de rRetConsDE (consulta por CDC).
+
+        La respuesta aprobada incluye:
+            dCodRes  = 0422
+            dMsgRes  = 'DE aprobado'
+            dProtAut = número de protocolo de autorización
+            dEstDE   = 'Aprobado'
+            dFecProc = fecha de procesamiento
+        """
+        try:
+            root = etree.fromstring(xml_bytes)
+            ns   = 'http://ekuatia.set.gov.py/sifen/xsd'
+
+            prot = root.find('.//{%s}rProtDe' % ns)
+            if prot is None:
+                # Respuesta de error sin rProtDe (ej. 0160 desde DataPower)
+                return self._parsear_respuesta_xml(xml_bytes)
+
+            def _text(tag):
+                el = prot.find('.//{%s}%s' % (ns, tag))
+                return el.text.strip() if el is not None and el.text else ''
+
+            codigo   = _text('dCodRes')
+            desc     = _text('dMsgRes')
+            estado   = _text('dEstDE') or _text('dEstRes')
+            protocolo = _text('dProtAut')
+            cdc      = _text('Id')
+            fecha    = _text('dFecProc')
+
+            raw = {
+                'xml':       xml_bytes.decode('utf-8', errors='replace'),
+                'cdc':       cdc,
+                'estado':    estado,
+                'protocolo': protocolo,
+                'fecha':     fecha,
+            }
+
+            resp = RespuestaSIFEN(codigo, desc, raw)
+            if protocolo:
+                logger.success(f"CDC consultado: {cdc} | Estado: {estado} | Protocolo: {protocolo}")
+            else:
+                logger.info(f"CDC consultado: {cdc} | Estado: {estado} | Código: {codigo}")
+            return resp
+        except Exception as e:
+            logger.error(f"Error parseando respuesta consulta DE: {e}")
+            return RespuestaSIFEN('ERR', str(e), {})
 
     def _parsear_respuesta_de(self, result) -> RespuestaSIFEN:
         """Parsea la respuesta de rRecepcionar / rConsultaDE."""
