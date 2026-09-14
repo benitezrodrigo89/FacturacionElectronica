@@ -42,6 +42,7 @@ class Conexion:
                 dbname=self.dbname,
                 user=self.user,
                 password=self.password,
+                cursor_factory=RealDictCursor,
             )
             logger.debug(f"Conectado a PostgreSQL: {self.dbname}@{self.host}:{self.port}")
         return self._conn
