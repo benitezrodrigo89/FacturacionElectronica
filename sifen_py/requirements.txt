@@ -30,5 +30,9 @@ loguru>=0.7.2
 # Base de datos
 psycopg2-binary>=2.9.9
 
+# API REST
+fastapi>=0.100.0
+uvicorn>=0.24.0
+
 # Testing (opcional)
 pytest>=8.1.1
