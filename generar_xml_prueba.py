@@ -20,6 +20,8 @@ sys.path.insert(0, 'sifen_py')
 
 from sifen_py.core.config import SifenConfig
 from sifen_py.services.signer import XMLSigner
+from sifen_py.db.conexion import Conexion
+from sifen_py.db.repositorio import RepositorioDE
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 CERT_PATH      = 'certificado_sifen.pfx'
@@ -222,11 +224,46 @@ def main():
         f.write(soap)
     print(f"    OK — guardado en: {OUTPUT_FILE}")
 
-    # 8. Enviar a SIFEN usando enviar_de_directo (lxml, SOAPAction vacío)
-    print("\n[4] Enviando a SIFEN...")
+    # 8. Inicializar base de datos
+    print("\n[4] Conectando a base de datos...")
+    db = Conexion()
+    repo = None
+    try:
+        db.crear_base_si_no_existe()
+        db.ejecutar_schema()
+        repo = RepositorioDE(db)
+        print("    OK — PostgreSQL conectado")
+    except Exception as e:
+        print(f"    ADVERTENCIA: no se pudo conectar a PostgreSQL ({e})")
+        print("    El envío continuará pero no se guardará en base de datos.")
+
+    # 9. Guardar como pendiente ANTES de enviar
+    if repo:
+        repo.guardar_pendiente(
+            cdc=cdc,
+            numero_doc=NUMERO_DOC,
+            xml_firmado=xml_firmado,
+            soap_envelope=soap,
+            ruc_receptor=data['cliente']['ruc'],
+            razon_social_receptor=data['cliente']['razonSocial'],
+            monto_total=int(data['condicion']['entregas'][0]['monto']),
+        )
+
+    # 10. Enviar a SIFEN usando enviar_de_directo (lxml, SOAPAction vacío)
+    print("\n[5] Enviando a SIFEN...")
     from sifen_py.services.soap_client import SifenSOAPClient
     client = SifenSOAPClient(config)
     respuesta = client.enviar_de_directo(xml_firmado)
+
+    # 11. Actualizar estado en BD con la respuesta
+    if repo:
+        repo.actualizar_respuesta(
+            cdc=cdc,
+            codigo=respuesta.codigo,
+            descripcion=respuesta.descripcion,
+            respuesta_xml=respuesta.raw.get('xml', ''),
+            protocolo=respuesta.raw.get('protocolo'),
+        )
 
     print("\n" + "=" * 55)
     print(f"  CDC:      {cdc}")
@@ -238,7 +275,14 @@ def main():
             print(f"\n  Respuesta SIFEN completa:\n{raw_xml}")
     if respuesta.codigo == '0260':
         print("  *** APROBADO ***")
+        if repo:
+            print(f"  Guardado en BD como: aprobado")
+    elif repo:
+        print(f"  Guardado en BD como: {respuesta.codigo}")
     print("=" * 55)
+
+    if db:
+        db.cerrar()
 
 
 if __name__ == '__main__':

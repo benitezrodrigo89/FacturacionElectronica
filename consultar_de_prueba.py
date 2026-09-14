@@ -16,6 +16,8 @@ sys.path.insert(0, 'sifen_py')
 
 from sifen_py.core.config import SifenConfig
 from sifen_py.services.soap_client import SifenSOAPClient
+from sifen_py.db.conexion import Conexion
+from sifen_py.db.repositorio import RepositorioDE
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 CERT_PATH     = 'certificado_sifen.pfx'
@@ -63,6 +65,15 @@ def main():
 
     client = SifenSOAPClient(config)
 
+    # Intentar conectar a BD (opcional — si no hay BD igual funciona)
+    db = Conexion()
+    repo = None
+    try:
+        db.conectar()
+        repo = RepositorioDE(db)
+    except Exception:
+        pass
+
     print("=" * 60)
     print("  CONSULTA DE ESTADO DE DOCUMENTOS ELECTRÓNICOS — SIFEN")
     print("=" * 60)
@@ -98,7 +109,24 @@ def main():
             if raw_xml:
                 print(f"\n  Respuesta SIFEN completa:\n{raw_xml}")
 
+        # Actualizar estado en BD si está disponible
+        if repo and respuesta.codigo in ('0422', '0420'):
+            try:
+                repo.actualizar_estado_consulta(
+                    cdc=cdc,
+                    codigo=respuesta.codigo,
+                    descripcion=respuesta.descripcion,
+                    protocolo=respuesta.raw.get('protocolo'),
+                    respuesta_xml=respuesta.raw.get('xml'),
+                )
+                print("  BD actualizada")
+            except Exception:
+                pass
+
     print("\n" + "=" * 60)
+
+    if db:
+        db.cerrar()
 
 
 if __name__ == '__main__':
