@@ -1,15 +1,19 @@
 """
-Script para generar el XML de prueba firmado para enviar a SIFEN via SoapUI.
+Script para generar el XML de prueba firmado y enviarlo a SIFEN.
 
 Uso:
     cd FacturacionElectronica
-    python3 generar_xml_prueba.py
+    python generar_xml_prueba.py
 
-El archivo generado se llama: soap_prueba.xml
-Cargarlo en SoapUI via File -> Load Request from File (NO copiar y pegar).
+El número de documento se obtiene automáticamente de la base de datos
+(último número + 1). Si la BD no está disponible usa NUMERO_DOC_FALLBACK.
+
+El archivo soap_prueba.xml también se guarda para cargarlo en SoapUI si
+se necesita: File -> Load Request from File (NO copiar y pegar).
 """
 import sys
 import json
+import random
 import subprocess
 import re
 import warnings
@@ -24,40 +28,55 @@ from sifen_py.db.conexion import Conexion
 from sifen_py.db.repositorio import RepositorioDE
 
 # ── Configuración ─────────────────────────────────────────────────────────────
-CERT_PATH      = 'certificado_sifen.pfx'
-CERT_PASSWORD  = 'ferreteria2026.'
-RUC            = '5722781-0'
-RAZON_SOCIAL   = 'AMARILLA ORTIZ OSVALDO MATHIAS ANTONIO'
+CERT_PATH       = 'certificado_sifen.pfx'
+CERT_PASSWORD   = 'ferreteria2026.'
+RUC             = '5722781-0'
+RAZON_SOCIAL    = 'AMARILLA ORTIZ OSVALDO MATHIAS ANTONIO'
 NOMBRE_FANTASIA = 'AMARILLA ORTIZ'
-TIMBRADO       = '05722781'
-TIMBRADO_FECHA = '2026-06-02'   # Fecha de inicio de vigencia en Marangatu
-CSC            = 'ABCD0000000000000000000000000000'
-CSC_ID         = '0001'
+TIMBRADO        = '05722781'
+TIMBRADO_FECHA  = '2026-06-02'
+CSC             = 'ABCD0000000000000000000000000000'
+CSC_ID          = '0001'
 
-# Número de documento — incrementar manualmente en cada prueba
-NUMERO_DOC = 82
+# Número de documento de respaldo — solo se usa si la BD no está disponible
+NUMERO_DOC_FALLBACK = 82
 
-# Código de seguridad aleatorio de 9 dígitos — cambiar en cada envío
-CODIGO_SEGURIDAD = '456123789'
-
-NODE_PATH = 'facturacionelectronicapy-xmlgen-main'
+NODE_PATH   = 'facturacionelectronicapy-xmlgen-main'
 OUTPUT_FILE = 'soap_prueba.xml'
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def main():
+    import os
     print("=" * 55)
     print("  GENERADOR DE XML PRUEBA SIFEN")
     print("=" * 55)
 
     # 1. Verificar certificado
-    import os
     if not os.path.exists(CERT_PATH):
         print(f"\nERROR: No se encontró el certificado: {CERT_PATH}")
         print("Colocá el archivo certificado_sifen.pfx en esta carpeta.")
         sys.exit(1)
 
-    # 2. Crear config
+    # 2. Conectar a BD y obtener próximo número de documento
+    print("\n[1] Conectando a base de datos...")
+    db = Conexion()
+    repo = None
+    try:
+        db.crear_base_si_no_existe()
+        db.ejecutar_schema()
+        repo = RepositorioDE(db)
+        numero_doc = repo.proximo_numero_doc()
+        print(f"    OK — próximo número: {numero_doc}")
+    except Exception as e:
+        numero_doc = NUMERO_DOC_FALLBACK
+        print(f"    ADVERTENCIA: BD no disponible ({e})")
+        print(f"    Usando número de respaldo: {numero_doc}")
+
+    # Código de seguridad aleatorio de 9 dígitos (distinto en cada ejecución)
+    codigo_seguridad = str(random.randint(100_000_000, 999_999_999))
+
+    # 3. Crear config
     config = SifenConfig(
         ambiente='test',
         ruc=RUC,
@@ -76,7 +95,7 @@ def main():
         ciudad=1,
     )
 
-    # 3. Parámetros para Node.js xmlgen
+    # 4. Parámetros para Node.js xmlgen
     params = {
         "version": 150,
         "ruc": RUC,
@@ -105,14 +124,13 @@ def main():
         }]
     }
 
-    # 4. Datos del documento
-    # Nota: descripcion del ítem es obligatoria para ambiente de prueba
+    # 5. Datos del documento
     data = {
         "tipoDocumento": 1,
         "establecimiento": "001",
         "punto": "001",
-        "numero": NUMERO_DOC,
-        "codigoSeguridadAleatorio": CODIGO_SEGURIDAD,
+        "numero": numero_doc,
+        "codigoSeguridadAleatorio": codigo_seguridad,
         "descripcion": "Factura de prueba",
         "observacion": "Prueba de envio SIFEN",
         "fecha": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
@@ -174,8 +192,8 @@ def main():
         }]
     }
 
-    # 5. Generar XML via Node.js
-    print(f"\n[1] Generando XML con Node.js (doc #{NUMERO_DOC})...")
+    # 6. Generar XML via Node.js
+    print(f"\n[2] Generando XML con Node.js (doc #{numero_doc})...")
     script = (
         f'const x=require("./dist/index.js");'
         f'const p={json.dumps(params, ensure_ascii=False)};'
@@ -196,8 +214,8 @@ def main():
     xml_generado = r.stdout.decode('utf-8').strip()
     print(f"    OK — {len(xml_generado)} caracteres")
 
-    # 6. Firmar XML
-    print("\n[2] Firmando XML con certificado digital...")
+    # 7. Firmar XML
+    print("\n[3] Firmando XML con certificado digital...")
     signer = XMLSigner(config)
     xml_firmado = signer.firmar_xml(xml_generado)
     print(f"    OK — {len(xml_firmado)} caracteres")
@@ -206,8 +224,8 @@ def main():
     cdc = m_cdc.group(1) if m_cdc else 'NO ENCONTRADO'
     print(f"    CDC: {cdc}")
 
-    # 7. Guardar también el envelope como string para SoapUI
-    print("\n[3] Construyendo envelope SOAP...")
+    # 8. Guardar envelope para SoapUI
+    print("\n[4] Construyendo envelope SOAP...")
     soap = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
@@ -224,24 +242,11 @@ def main():
         f.write(soap)
     print(f"    OK — guardado en: {OUTPUT_FILE}")
 
-    # 8. Inicializar base de datos
-    print("\n[4] Conectando a base de datos...")
-    db = Conexion()
-    repo = None
-    try:
-        db.crear_base_si_no_existe()
-        db.ejecutar_schema()
-        repo = RepositorioDE(db)
-        print("    OK — PostgreSQL conectado")
-    except Exception as e:
-        print(f"    ADVERTENCIA: no se pudo conectar a PostgreSQL ({e})")
-        print("    El envío continuará pero no se guardará en base de datos.")
-
     # 9. Guardar como pendiente ANTES de enviar
     if repo:
         repo.guardar_pendiente(
             cdc=cdc,
-            numero_doc=NUMERO_DOC,
+            numero_doc=numero_doc,
             xml_firmado=xml_firmado,
             soap_envelope=soap,
             ruc_receptor=data['cliente']['ruc'],
@@ -249,7 +254,7 @@ def main():
             monto_total=int(data['condicion']['entregas'][0]['monto']),
         )
 
-    # 10. Enviar a SIFEN usando enviar_de_directo (lxml, SOAPAction vacío)
+    # 10. Enviar a SIFEN
     print("\n[5] Enviando a SIFEN...")
     from sifen_py.services.soap_client import SifenSOAPClient
     client = SifenSOAPClient(config)
@@ -266,19 +271,16 @@ def main():
         )
 
     print("\n" + "=" * 55)
+    print(f"  Doc #:    {numero_doc}")
     print(f"  CDC:      {cdc}")
     print(f"  Código:   {respuesta.codigo}")
     print(f"  Estado:   {respuesta.descripcion}")
-    if respuesta.codigo not in ('0260',):
+    if respuesta.codigo == '0260':
+        print("  *** APROBADO ***")
+    elif respuesta.codigo not in ('0260',):
         raw_xml = respuesta.raw.get('xml', '')
         if raw_xml:
             print(f"\n  Respuesta SIFEN completa:\n{raw_xml}")
-    if respuesta.codigo == '0260':
-        print("  *** APROBADO ***")
-        if repo:
-            print(f"  Guardado en BD como: aprobado")
-    elif repo:
-        print(f"  Guardado en BD como: {respuesta.codigo}")
     print("=" * 55)
 
     if db:
