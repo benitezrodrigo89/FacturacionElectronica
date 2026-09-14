@@ -244,6 +244,8 @@ def main():
 
     # 9. Guardar como pendiente ANTES de enviar
     if repo:
+        # Agregar timbrado al data para que el KuDE lo pueda mostrar
+        data_para_bd = {**data, 'timbrado': TIMBRADO}
         repo.guardar_pendiente(
             cdc=cdc,
             numero_doc=numero_doc,
@@ -252,6 +254,7 @@ def main():
             ruc_receptor=data['cliente']['ruc'],
             razon_social_receptor=data['cliente']['razonSocial'],
             monto_total=int(data['condicion']['entregas'][0]['monto']),
+            data_documento=data_para_bd,
         )
 
     # 10. Enviar a SIFEN

@@ -18,14 +18,17 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'sifen_py'))
 
+import json
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from typing import List, Optional
 
 from sifen_py.db.conexion import Conexion
 from sifen_py.db.repositorio import RepositorioDE
 from sifen_py.core.config import SifenConfig
 from sifen_py.services.soap_client import SifenSOAPClient
+from sifen_py.generators.kude import KuDEGenerator
 
 from .schemas import DocumentoResponse, DocumentoListItem, ConsultaSifenResponse, ResumenResponse
 
@@ -60,12 +63,19 @@ def get_repo() -> RepositorioDE:
     return RepositorioDE(db)
 
 
-def get_sifen_client() -> SifenSOAPClient:
-    config = SifenConfig(
+RAZON_SOCIAL = os.getenv('SIFEN_RAZON_SOCIAL', 'AMARILLA ORTIZ OSVALDO MATHIAS ANTONIO')
+ACTIVIDAD    = os.getenv('SIFEN_ACTIVIDAD',    'COMERCIO AL POR MENOR DE ARTÍCULOS DE FERRETERÍA')
+DIRECCION    = os.getenv('SIFEN_DIRECCION',    'Asuncion')
+TELEFONO     = os.getenv('SIFEN_TELEFONO',     '0981000000')
+EMAIL        = os.getenv('SIFEN_EMAIL',        'empresa@empresa.com')
+
+
+def get_config() -> SifenConfig:
+    return SifenConfig(
         ambiente=AMBIENTE,
         ruc=RUC,
-        razon_social='AMARILLA ORTIZ OSVALDO MATHIAS ANTONIO',
-        nombre_fantasia='AMARILLA ORTIZ',
+        razon_social=RAZON_SOCIAL,
+        nombre_fantasia=os.getenv('SIFEN_NOMBRE_FANTASIA', RAZON_SOCIAL),
         certificado_path=CERT_PATH,
         certificado_password=CERT_PASSWORD,
         csc=CSC,
@@ -77,8 +87,15 @@ def get_sifen_client() -> SifenSOAPClient:
         departamento=1,
         distrito=1,
         ciudad=1,
+        actividad_economica=ACTIVIDAD,
+        direccion=DIRECCION,
+        telefono=TELEFONO,
+        email=EMAIL,
     )
-    return SifenSOAPClient(config)
+
+
+def get_sifen_client() -> SifenSOAPClient:
+    return SifenSOAPClient(get_config())
 
 
 def fila_a_dict(row) -> dict:
@@ -224,6 +241,72 @@ def resumen_estados():
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         repo.db.cerrar()
+
+
+@app.get(
+    "/de/{cdc}/kude",
+    summary="Descargar KuDE (PDF del comprobante)",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def descargar_kude(cdc: str):
+    """
+    Genera y descarga el KuDE en PDF para el documento indicado por su CDC.
+
+    El documento debe existir en la base de datos con `data_json` guardado
+    (todos los documentos enviados con la versión actual del sistema lo tienen).
+    """
+    if len(cdc) != 44:
+        raise HTTPException(status_code=400, detail="El CDC debe tener exactamente 44 dígitos")
+
+    repo = get_repo()
+    try:
+        fila = repo.obtener_por_cdc(cdc)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        repo.db.cerrar()
+
+    if not fila:
+        raise HTTPException(status_code=404, detail=f"No se encontró el documento: {cdc}")
+
+    fila = fila_a_dict(fila)
+    data_json_str = fila.get('data_json')
+    if not data_json_str:
+        raise HTTPException(
+            status_code=422,
+            detail="Este documento no tiene datos guardados para generar el KuDE. "
+                   "Solo documentos enviados con la versión actual del sistema tienen este dato."
+        )
+
+    try:
+        data = json.loads(data_json_str)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al leer los datos del documento")
+
+    estado_bd  = fila.get('estado', 'pendiente')
+    estado_map = {'aprobado': 'A', 'rechazado': 'R'}
+    estado_kude = estado_map.get(estado_bd, 'P')
+
+    try:
+        config = get_config()
+        gen    = KuDEGenerator(config)
+        pdf    = gen.generar(
+            data=data,
+            cdc=cdc,
+            estado=estado_kude,
+            numero_protocolo=fila.get('protocolo_autorizacion'),
+            fecha_procesamiento=str(fila.get('fecha_respuesta') or ''),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando KuDE: {e}")
+
+    numero = fila.get('numero_doc', cdc[:10])
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="kude_{numero}.pdf"'},
+    )
 
 
 @app.get("/", include_in_schema=False)

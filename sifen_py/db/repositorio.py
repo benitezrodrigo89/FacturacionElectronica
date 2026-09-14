@@ -2,6 +2,7 @@
 Repositorio de Documentos Electrónicos — operaciones CRUD sobre la tabla
 documentos_electronicos.
 """
+import json
 from datetime import datetime, timezone
 from typing import Optional
 from loguru import logger
@@ -45,12 +46,14 @@ class RepositorioDE:
         ruc_receptor:          str           = None,
         razon_social_receptor: str           = None,
         monto_total:           int           = None,
+        data_documento:        dict          = None,
     ) -> int:
         """
         Inserta un DE en estado 'pendiente' antes de enviarlo a SIFEN.
         Devuelve el id generado. Si el CDC ya existe actualiza el intento.
         """
         fecha_emision = fecha_emision or datetime.now(timezone.utc)
+        data_json_str = json.dumps(data_documento, ensure_ascii=False) if data_documento else None
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
@@ -58,17 +61,18 @@ class RepositorioDE:
                     cdc, numero_doc, establecimiento, punto_expedicion,
                     tipo_documento, fecha_emision, ruc_receptor,
                     razon_social_receptor, monto_total,
-                    xml_firmado, soap_envelope, estado, fecha_envio
+                    xml_firmado, soap_envelope, data_json, estado, fecha_envio
                 ) VALUES (
                     %(cdc)s, %(numero_doc)s, %(establecimiento)s, %(punto_expedicion)s,
                     %(tipo_documento)s, %(fecha_emision)s, %(ruc_receptor)s,
                     %(razon_social_receptor)s, %(monto_total)s,
-                    %(xml_firmado)s, %(soap_envelope)s, 'pendiente', NOW()
+                    %(xml_firmado)s, %(soap_envelope)s, %(data_json)s, 'pendiente', NOW()
                 )
                 ON CONFLICT (cdc) DO UPDATE SET
-                    intentos    = documentos_electronicos.intentos + 1,
-                    fecha_envio = NOW(),
-                    soap_envelope = EXCLUDED.soap_envelope
+                    intentos      = documentos_electronicos.intentos + 1,
+                    fecha_envio   = NOW(),
+                    soap_envelope = EXCLUDED.soap_envelope,
+                    data_json     = COALESCE(EXCLUDED.data_json, documentos_electronicos.data_json)
                 RETURNING id
             """, {
                 'cdc':                   cdc,
@@ -82,6 +86,7 @@ class RepositorioDE:
                 'monto_total':           monto_total,
                 'xml_firmado':           xml_firmado,
                 'soap_envelope':         soap_envelope,
+                'data_json':             data_json_str,
             })
             row = cur.fetchone()
             id_ = row[0] if isinstance(row, tuple) else row['id']

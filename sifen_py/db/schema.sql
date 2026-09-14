@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS documentos_electronicos (
     -- Documento
     xml_firmado             TEXT NOT NULL,               -- rDE firmado completo
     soap_envelope           TEXT,                        -- envelope enviado a SIFEN
+    data_json               TEXT,                        -- datos originales del documento (JSON)
 
     -- Estado SIFEN
     estado                  VARCHAR(20) NOT NULL DEFAULT 'pendiente',
