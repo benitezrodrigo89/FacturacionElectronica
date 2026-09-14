@@ -91,8 +91,8 @@ class SifenSOAPClient:
 
     # Endpoints HTTP directos (sin WSDL) — misma URL sin .wsdl
     URLS_ENDPOINT = {
-        'test': 'https://sifen-test.set.gov.py/de/ws/sync/recibe',
-        'prod': 'https://sifen.set.gov.py/de/ws/sync/recibe',
+        'test': 'https://sifen-test.set.gov.py/de/ws/sync/recibe.wsdl',
+        'prod': 'https://sifen.set.gov.py/de/ws/sync/recibe.wsdl',
     }
 
     def __init__(self, config: SifenConfig, timeout: int = 60):
