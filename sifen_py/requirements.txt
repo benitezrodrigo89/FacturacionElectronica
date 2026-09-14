@@ -27,5 +27,8 @@ pydantic>=2.6.4
 # Logging
 loguru>=0.7.2
 
+# Base de datos
+psycopg2-binary>=2.9.9
+
 # Testing (opcional)
 pytest>=8.1.1
