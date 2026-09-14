@@ -33,10 +33,10 @@ CSC            = 'ABCD0000000000000000000000000000'
 CSC_ID         = '0001'
 
 # Número de documento — incrementar manualmente en cada prueba
-NUMERO_DOC = 78
+NUMERO_DOC = 79
 
 # Código de seguridad aleatorio de 9 dígitos — cambiar en cada envío
-CODIGO_SEGURIDAD = '123456789'
+CODIGO_SEGURIDAD = '987654321'
 
 NODE_PATH = 'facturacionelectronicapy-xmlgen-main'
 OUTPUT_FILE = 'soap_prueba.xml'
