@@ -35,7 +35,7 @@ CSC            = 'ABCD0000000000000000000000000000'
 CSC_ID         = '0001'
 
 # Número de documento — incrementar manualmente en cada prueba
-NUMERO_DOC = 81
+NUMERO_DOC = 82
 
 # Código de seguridad aleatorio de 9 dígitos — cambiar en cada envío
 CODIGO_SEGURIDAD = '456123789'
