@@ -14,7 +14,7 @@ from sifen_py.db.repositorio import RepositorioDE
 
 from app.config_manager import get_sifen_config, load_config
 from app.api.auth import require_api_key
-from app.api.schemas import FacturaRequest, FacturaResponse, CancelacionRequest
+from app.api.schemas import FacturaRequest, FacturaResponse, CancelacionRequest, InutilizacionRequest
 
 router = APIRouter(prefix='/api/v1', tags=['Facturas'])
 
@@ -278,6 +278,74 @@ async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depen
         "codigo_sifen": respuesta.codigo,
         "descripcion": respuesta.descripcion,
         "estado": estado_resultado,
+    }
+
+
+@router.post('/inutilizaciones', status_code=201, summary="Inutilizar rango de numeración")
+async def inutilizar_numeracion(req: InutilizacionRequest, _key: str = Depends(require_api_key)):
+    """
+    Declara ante SIFEN que un rango de números no será utilizado.
+
+    Usar cuando documentos fueron rechazados o generados por error y esos
+    números no se van a reutilizar. SIFEN registra la inutilización y la
+    numeración queda formalmente anulada en su sistema.
+    """
+    if req.numero_hasta < req.numero_desde:
+        raise HTTPException(status_code=400, detail="numero_hasta debe ser >= numero_desde")
+
+    cfg          = load_config()
+    sifen_config = get_sifen_config()
+
+    # Generar XML del evento de inutilización
+    try:
+        wrapper   = XMLGeneratorWrapper(sifen_config)
+        xml_evento = wrapper.generar_xml_evento_inutilizacion(
+            tipo_documento=req.tipo_documento,
+            establecimiento=cfg['establecimiento'],
+            punto=cfg['punto_expedicion'],
+            numero_desde=req.numero_desde,
+            numero_hasta=req.numero_hasta,
+            motivo=req.motivo,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando evento: {e}")
+
+    # Firmar el evento
+    try:
+        signer          = XMLSigner(sifen_config)
+        xml_evento_firmado = signer.firmar_xml(xml_evento)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error firmando evento: {e}")
+
+    # Enviar a SIFEN
+    try:
+        client    = SifenSOAPClient(sifen_config)
+        respuesta = client.enviar_evento_directo(xml_evento_firmado)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error enviando a SIFEN: {e}")
+
+    # Marcar en BD los documentos del rango que existan
+    docs_actualizados = 0
+    try:
+        db   = Conexion()
+        db.conectar()
+        repo = RepositorioDE(db)
+        docs_actualizados = repo.marcar_inutilizados(
+            tipo_documento=req.tipo_documento,
+            numero_desde=req.numero_desde,
+            numero_hasta=req.numero_hasta,
+        )
+        db.cerrar()
+    except Exception:
+        pass
+
+    return {
+        "tipo_documento":      req.tipo_documento,
+        "numero_desde":        req.numero_desde,
+        "numero_hasta":        req.numero_hasta,
+        "codigo_sifen":        respuesta.codigo,
+        "descripcion":         respuesta.descripcion,
+        "docs_actualizados_bd": docs_actualizados,
     }
 
 

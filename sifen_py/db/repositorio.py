@@ -172,6 +172,36 @@ class RepositorioDE:
         conn.commit()
         logger.info(f"Estado actualizado por consulta — CDC: {cdc[:20]}… | {estado}")
 
+    def marcar_inutilizados(
+        self,
+        tipo_documento: int,
+        numero_desde:   int,
+        numero_hasta:   int,
+    ) -> int:
+        """
+        Marca como 'inutilizado' los DEs en el rango de números indicado.
+        Solo afecta documentos que NO están aprobados ni cancelados.
+        Devuelve la cantidad de registros actualizados.
+        """
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE documentos_electronicos SET
+                    estado          = 'inutilizado',
+                    fecha_respuesta = NOW()
+                WHERE tipo_documento = %(tipo_doc)s
+                  AND numero_doc BETWEEN %(desde)s AND %(hasta)s
+                  AND estado NOT IN ('aprobado', 'cancelado')
+            """, {
+                'tipo_doc': tipo_documento,
+                'desde':    numero_desde,
+                'hasta':    numero_hasta,
+            })
+            count = cur.rowcount
+        conn.commit()
+        logger.info(f"Inutilizados {count} DEs — tipo:{tipo_documento} rango:[{numero_desde}-{numero_hasta}]")
+        return count
+
     def marcar_cancelado(
         self,
         cdc:           str,

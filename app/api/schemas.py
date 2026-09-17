@@ -57,6 +57,13 @@ class CancelacionRequest(BaseModel):
     motivo: str = Field(min_length=5, description="Motivo de la cancelación")
 
 
+class InutilizacionRequest(BaseModel):
+    tipo_documento: int = Field(default=1, description="1=FE, 5=NCE, 6=NDE, 7=NRE")
+    numero_desde:   int = Field(gt=0, description="Primer número a inutilizar")
+    numero_hasta:   int = Field(gt=0, description="Último número a inutilizar (puede ser igual a numero_desde)")
+    motivo:         str = Field(min_length=5, description="Motivo de la inutilización")
+
+
 class MotivoNCE(IntEnum):
     DEVOLUCION_Y_AJUSTE  = 1
     DEVOLUCION           = 2
