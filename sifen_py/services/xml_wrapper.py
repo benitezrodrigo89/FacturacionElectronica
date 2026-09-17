@@ -31,14 +31,22 @@ class XMLGeneratorWrapper:
 
     def _find_node_project(self) -> Path:
         """
-        Encuentra la ruta del proyecto Node.js
-
-        Returns:
-            Path al proyecto Node.js
+        Encuentra la ruta del proyecto Node.js subiendo niveles desde este archivo.
+        Funciona independientemente de la estructura de carpetas del sistema operativo.
         """
-        # Buscar desde la ubicación actual
-        current = Path(__file__).parent.parent.parent
-        node_path = current / "FacturacionElectronica" / "facturacionelectronicapy-xmlgen-main"
+        NODE_DIR = "facturacionelectronicapy-xmlgen-main"
+        search_from = Path(__file__).resolve().parent
+        for _ in range(7):
+            candidate = search_from / NODE_DIR
+            if candidate.exists():
+                node_path = candidate
+                break
+            search_from = search_from.parent
+        else:
+            raise XMLGenerationException(
+                f"No se encontró el proyecto Node.js '{NODE_DIR}'. "
+                "Asegurate de que esté en la misma carpeta que sifen_py."
+            )
 
         if not node_path.exists():
             raise XMLGenerationException(
