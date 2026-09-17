@@ -88,6 +88,49 @@ class NotaCreditoRequest(BaseModel):
     descripcion:           Optional[str] = None
 
 
+# ── Nota de Remisión ──────────────────────────────────────────────────────────
+
+class MotivoRemision(IntEnum):
+    TRASLADO_ENTRE_LOCALES  = 1
+    TRASLADO_A_TERCEROS     = 2
+    EXPORTACION             = 3
+    CONSIGNACION            = 4
+    DEVOLUCION              = 5
+    OTROS                   = 9
+
+
+class ItemRemisionRequest(BaseModel):
+    descripcion:    str
+    cantidad:       float = Field(gt=0)
+    codigo:         Optional[str] = None
+    unidad_medida:  int   = 77
+    precio_unitario: Optional[int] = Field(
+        default=None,
+        description="Precio unitario en PYG. Opcional para remisión sin valor comercial."
+    )
+
+
+class VehiculoRequest(BaseModel):
+    matricula:  str
+    marca:      Optional[str] = None
+
+
+class TransportistaRequest(BaseModel):
+    nombre:           str
+    documento_numero: str
+    vehiculo:         Optional[VehiculoRequest] = None
+
+
+class NotaRemisionRequest(BaseModel):
+    receptor:           ReceptorRequest
+    items:              List[ItemRemisionRequest] = Field(min_length=1)
+    motivo:             MotivoRemision = MotivoRemision.OTROS
+    transportista:      Optional[TransportistaRequest] = None
+    direccion_origen:   Optional[str] = Field(default=None, description="Dirección de origen del traslado")
+    direccion_destino:  Optional[str] = Field(default=None, description="Dirección de destino del traslado")
+    descripcion:        Optional[str] = None
+
+
 class FacturaResponse(BaseModel):
     cdc: str
     numero_doc: int
