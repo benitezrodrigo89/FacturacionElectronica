@@ -203,7 +203,8 @@ async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_ke
     )
 
 
-@router.post('/facturas/{cdc}/cancelar', summary="Cancelar factura electrónica")
+@router.post('/documentos/{cdc}/cancelar', summary="Cancelar documento electrónico (FE, NCE, NRE)")
+@router.post('/facturas/{cdc}/cancelar',   summary="Cancelar factura electrónica (alias)", include_in_schema=False)
 async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depends(require_api_key)):
     """
     Cancela un DE aprobado enviando el evento de cancelación a SIFEN.

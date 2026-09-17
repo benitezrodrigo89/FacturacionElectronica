@@ -116,7 +116,7 @@ async function confirmarAnulacion() {
   btn.disabled = true;
 
   try {
-    const resp = await fetch(`/api/v1/facturas/${cdc}/cancelar`, {
+    const resp = await fetch(`/api/v1/documentos/${cdc}/cancelar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Key': '' },
       body: JSON.stringify({ motivo }),
