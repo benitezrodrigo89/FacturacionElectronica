@@ -169,6 +169,7 @@ class XMLGeneratorWrapper:
                 input=script,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
                 cwd=str(self.node_project_path),
                 timeout=30
             )
@@ -374,6 +375,7 @@ xmlgen.default.{metodo}(1, params, data).then(xml => {{
                 input=script,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
                 cwd=str(self.node_project_path),
                 timeout=30
             )
