@@ -57,7 +57,7 @@ def save_config(updates: dict) -> None:
 
 def get_sifen_config() -> SifenConfig:
     c = load_config()
-    return SifenConfig(
+    cfg = SifenConfig(
         ambiente=c['ambiente'],
         ruc=c['ruc'],
         razon_social=c['razon_social'],
@@ -78,6 +78,10 @@ def get_sifen_config() -> SifenConfig:
         telefono=c.get('telefono', ''),
         email=c.get('email', ''),
     )
+    # Atributos extra para que _prepare_params use código y descripción correctos
+    cfg.actividad_economica_codigo      = c.get('actividad_economica_codigo', '0')
+    cfg.actividad_economica_descripcion = c.get('actividad_economica_descripcion', 'Actividad principal')
+    return cfg
 
 
 def get_api_keys() -> list:

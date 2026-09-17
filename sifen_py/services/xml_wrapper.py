@@ -97,9 +97,9 @@ class XMLGeneratorWrapper:
             "timbradoFecha":  getattr(self.config, 'timbrado_fecha',
                                       datetime.now().strftime('%Y-%m-%d')),
             "actividadesEconomicas": [{
-                "codigo": self.config.actividad_economica or "0",
-                "descripcion": "Actividad principal"
-            }] if self.config.actividad_economica else [],
+                "codigo": getattr(self.config, 'actividad_economica_codigo', self.config.actividad_economica or "0"),
+                "descripcion": getattr(self.config, 'actividad_economica_descripcion', self.config.actividad_economica or "Actividad principal"),
+            }] if (self.config.actividad_economica or getattr(self.config, 'actividad_economica_codigo', None)) else [],
             "tipoContribuyente": 2,
             "tipoRegimen": 8,
             "establecimientos": [{
