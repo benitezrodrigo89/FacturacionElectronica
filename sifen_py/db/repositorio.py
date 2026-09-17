@@ -172,6 +172,35 @@ class RepositorioDE:
         conn.commit()
         logger.info(f"Estado actualizado por consulta — CDC: {cdc[:20]}… | {estado}")
 
+    def marcar_cancelado(
+        self,
+        cdc:           str,
+        codigo:        str,
+        descripcion:   str,
+        respuesta_xml: str = None,
+    ):
+        """
+        Marca un DE como cancelado. Solo aplica si el estado actual es 'aprobado'.
+        """
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE documentos_electronicos SET
+                    estado            = 'cancelado',
+                    codigo_sifen      = %(codigo)s,
+                    descripcion_sifen = %(descripcion)s,
+                    respuesta_xml     = COALESCE(%(respuesta_xml)s, respuesta_xml),
+                    fecha_respuesta   = NOW()
+                WHERE cdc = %(cdc)s AND estado = 'aprobado'
+            """, {
+                'cdc':           cdc,
+                'codigo':        codigo,
+                'descripcion':   descripcion,
+                'respuesta_xml': respuesta_xml,
+            })
+        conn.commit()
+        logger.info(f"DE cancelado — CDC: {cdc[:20]}… | código: {codigo}")
+
     # ─────────────────────────────────────────────────────────────────
     # LECTURA
     # ─────────────────────────────────────────────────────────────────

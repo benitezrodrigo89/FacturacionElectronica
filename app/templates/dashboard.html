@@ -57,10 +57,93 @@
   </div>
 </div>
 
+<!-- Modal anulación -->
+<div class="modal fade" id="modalAnular" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-x-circle me-1"></i>Anular Documento</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          Documento N° <strong id="anular-numero"></strong>
+          <br><code id="anular-cdc" class="small"></code>
+        </p>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Motivo de anulación <span class="text-danger">*</span></label>
+          <textarea id="anular-motivo" class="form-control" rows="3"
+                    placeholder="Ej: Error en datos del receptor" minlength="5"></textarea>
+        </div>
+        <div id="anular-resultado" class="d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="btn-confirmar-anular"
+                onclick="confirmarAnulacion()">
+          <span id="anular-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
+          Confirmar Anulación
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 function setActive(btn) {
   document.querySelectorAll('#filtros button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+}
+
+function prepararAnulacion(btn) {
+  document.getElementById('anular-cdc').textContent    = btn.dataset.cdc;
+  document.getElementById('anular-numero').textContent = btn.dataset.numero;
+  document.getElementById('anular-motivo').value       = '';
+  document.getElementById('anular-resultado').className = 'd-none';
+}
+
+async function confirmarAnulacion() {
+  const cdc    = document.getElementById('anular-cdc').textContent;
+  const motivo = document.getElementById('anular-motivo').value.trim();
+  if (motivo.length < 5) {
+    alert('El motivo debe tener al menos 5 caracteres.');
+    return;
+  }
+
+  const spinner = document.getElementById('anular-spinner');
+  const btn     = document.getElementById('btn-confirmar-anular');
+  spinner.classList.remove('d-none');
+  btn.disabled = true;
+
+  try {
+    const resp = await fetch(`/api/v1/facturas/${cdc}/cancelar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': '' },
+      body: JSON.stringify({ motivo }),
+    });
+    const data = await resp.json();
+    const res  = document.getElementById('anular-resultado');
+    if (resp.ok) {
+      res.innerHTML = `<div class="alert alert-success mb-0">
+        <strong>Código SIFEN:</strong> ${data.codigo_sifen} — ${data.descripcion}<br>
+        <strong>Estado:</strong> ${data.estado}
+      </div>`;
+      res.className = '';
+      // Recargar tabla después de 1.5s
+      setTimeout(() => {
+        bootstrap.Modal.getInstance(document.getElementById('modalAnular')).hide();
+        htmx.trigger('#content', 'load');
+      }, 1500);
+    } else {
+      res.innerHTML = `<div class="alert alert-danger mb-0">${data.detail || 'Error al anular'}</div>`;
+      res.className = '';
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + e.message);
+  } finally {
+    spinner.classList.add('d-none');
+    btn.disabled = false;
+  }
 }
 </script>
 {% endblock %}

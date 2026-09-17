@@ -44,7 +44,7 @@
             <th class="text-end">Monto</th>
             <th>Estado</th>
             <th>CDC</th>
-            <th class="text-center">KuDE</th>
+            <th class="text-center">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -68,20 +68,31 @@
                 <span class="badge badge-aprobado rounded-pill">Aprobado</span>
               {% elif doc.estado == 'rechazado' %}
                 <span class="badge badge-rechazado rounded-pill">Rechazado</span>
+              {% elif doc.estado == 'cancelado' %}
+                <span class="badge bg-secondary rounded-pill">Cancelado</span>
               {% else %}
                 <span class="badge badge-pendiente rounded-pill">Pendiente</span>
               {% endif %}
             </td>
             <td><code class="cdc">{{ doc.cdc[:16] }}…</code></td>
-            <td class="text-center">
+            <td class="text-center text-nowrap">
               {% if doc.data_json %}
               <a href="/api/v1/facturas/{{ doc.cdc }}/kude"
                  class="btn btn-outline-primary btn-sm"
                  title="Descargar KuDE PDF">
                 <i class="bi bi-file-earmark-pdf"></i>
               </a>
-              {% else %}
-              <span class="text-muted small">—</span>
+              {% endif %}
+              {% if doc.estado == 'aprobado' %}
+              <button class="btn btn-outline-danger btn-sm ms-1"
+                      title="Anular documento"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalAnular"
+                      data-cdc="{{ doc.cdc }}"
+                      data-numero="{{ doc.numero_doc }}"
+                      onclick="prepararAnulacion(this)">
+                <i class="bi bi-x-circle"></i>
+              </button>
               {% endif %}
             </td>
           </tr>

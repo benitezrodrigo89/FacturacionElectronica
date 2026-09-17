@@ -53,6 +53,10 @@ class FacturaRequest(BaseModel):
     descripcion: Optional[str] = Field(default=None, description="Descripción de la operación")
 
 
+class CancelacionRequest(BaseModel):
+    motivo: str = Field(min_length=5, description="Motivo de la cancelación")
+
+
 class FacturaResponse(BaseModel):
     cdc: str
     numero_doc: int

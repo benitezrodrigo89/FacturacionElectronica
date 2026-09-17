@@ -107,6 +107,12 @@ class SifenSOAPClient:
         'prod': 'https://sifen.set.gov.py/de/ws/consultas/consulta-ruc.wsdl',
     }
 
+    # Endpoints HTTP directos para eventos (cancelación, inutilización, etc.)
+    URLS_EVENTO = {
+        'test': 'https://sifen-test.set.gov.py/de/ws/async/recibe-evento.wsdl',
+        'prod': 'https://sifen.set.gov.py/de/ws/async/recibe-evento.wsdl',
+    }
+
     def __init__(self, config: SifenConfig, timeout: int = 60):
         if not ZEEP_AVAILABLE:
             raise SOAPException(
@@ -602,6 +608,73 @@ class SifenSOAPClient:
             raise SOAPException(f"SOAP Fault en enviar_evento: {e}") from e
         except Exception as e:
             raise SOAPException(f"Error en enviar_evento: {e}") from e
+
+    def enviar_evento_directo(self, xml_evento_firmado: str) -> RespuestaSIFEN:
+        """
+        Envía un evento firmado via HTTP POST directo (sin zeep/WSDL).
+        Mismo patrón que enviar_de_directo — funciona desde cualquier IP.
+
+        Args:
+            xml_evento_firmado: XML del evento firmado (cancelación, inutilización, etc.)
+
+        Returns:
+            RespuestaSIFEN con el resultado
+        """
+        envelope_str = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            '<env:Header/>'
+            '<env:Body>'
+            '<rRecepcionEvento xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<dId>1</dId>'
+            f'<xEvento>{xml_evento_firmado}</xEvento>'
+            '</rRecepcionEvento>'
+            '</env:Body>'
+            '</env:Envelope>'
+        )
+        envelope = envelope_str.encode('ascii')
+        url     = self.URLS_EVENTO[self.config.ambiente]
+        session = self._get_session()
+        headers = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+        logger.info(f"Enviando evento directo a: {url}")
+        try:
+            resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
+        except Exception as e:
+            raise SOAPException(f"Error HTTP al enviar evento: {e}") from e
+
+        if resp.status_code not in (200, 400, 500):
+            resp.raise_for_status()
+
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        return self._parsear_respuesta_evento_xml(resp.content)
+
+    def _parsear_respuesta_evento_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:
+        """Parsea la respuesta SOAP de rRecepcionEvento (HTTP directo)."""
+        try:
+            root = etree.fromstring(xml_bytes)
+            ns   = 'http://ekuatia.set.gov.py/sifen/xsd'
+
+            cod_el = root.find('.//{%s}dCodRes' % ns)
+            msg_el = root.find('.//{%s}dMsgRes' % ns)
+            codigo = cod_el.text.strip() if cod_el is not None and cod_el.text else ''
+            desc   = msg_el.text.strip() if msg_el is not None and msg_el.text else ''
+
+            if not codigo:
+                fault = root.find('.//{http://www.w3.org/2003/05/soap-envelope}Fault')
+                if fault is not None:
+                    codigo = 'ERR'
+                    txt = fault.find('.//{http://www.w3.org/2003/05/soap-envelope}Text')
+                    desc = txt.text if txt is not None else 'SOAP Fault'
+
+            xml_str = xml_bytes.decode('utf-8', errors='replace')
+            return RespuestaSIFEN(codigo or 'ERR', desc or 'Sin descripción', {'xml': xml_str})
+        except Exception as e:
+            logger.error(f"Error parseando respuesta evento XML: {e}")
+            xml_str = xml_bytes.decode('utf-8', errors='replace') if xml_bytes else ''
+            return RespuestaSIFEN('ERR', str(e), {'xml': xml_str})
 
     # ─────────────────────────────────────────────────────────
     # HELPERS INTERNOS

@@ -14,7 +14,7 @@ from sifen_py.db.repositorio import RepositorioDE
 
 from app.config_manager import get_sifen_config, load_config
 from app.api.auth import require_api_key
-from app.api.schemas import FacturaRequest, FacturaResponse
+from app.api.schemas import FacturaRequest, FacturaResponse, CancelacionRequest
 
 router = APIRouter(prefix='/api/v1', tags=['Facturas'])
 
@@ -201,6 +201,83 @@ async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_ke
         kude_url=f"/api/v1/facturas/{cdc}/kude",
         fecha_envio=datetime.now(),
     )
+
+
+@router.post('/facturas/{cdc}/cancelar', summary="Cancelar factura electrónica")
+async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depends(require_api_key)):
+    """
+    Cancela un DE aprobado enviando el evento de cancelación a SIFEN.
+    Solo se puede cancelar un documento en estado 'aprobado'.
+    """
+    if len(cdc) != 44:
+        raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
+
+    # Verificar que existe y está aprobado
+    db = Conexion()
+    try:
+        db.conectar()
+        repo = RepositorioDE(db)
+        fila = repo.obtener_por_cdc(cdc)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.cerrar()
+
+    if not fila:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+
+    fila = dict(fila) if hasattr(fila, 'keys') else fila
+    if fila.get('estado') != 'aprobado':
+        raise HTTPException(
+            status_code=422,
+            detail=f"Solo se pueden cancelar documentos aprobados. Estado actual: {fila.get('estado')}"
+        )
+
+    sifen_config = get_sifen_config()
+
+    # Generar XML del evento de cancelación
+    try:
+        wrapper = XMLGeneratorWrapper(sifen_config)
+        xml_evento = wrapper.generar_xml_evento_cancelacion(cdc, body.motivo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando evento: {e}")
+
+    # Firmar el evento
+    try:
+        signer = XMLSigner(sifen_config)
+        xml_evento_firmado = signer.firmar_xml(xml_evento)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error firmando evento: {e}")
+
+    # Enviar a SIFEN
+    try:
+        client = SifenSOAPClient(sifen_config)
+        respuesta = client.enviar_evento_directo(xml_evento_firmado)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error enviando evento a SIFEN: {e}")
+
+    # Actualizar BD
+    try:
+        db = Conexion()
+        db.conectar()
+        repo = RepositorioDE(db)
+        repo.marcar_cancelado(
+            cdc=cdc,
+            codigo=respuesta.codigo,
+            descripcion=respuesta.descripcion,
+            respuesta_xml=respuesta.raw.get('xml', ''),
+        )
+        db.cerrar()
+    except Exception:
+        pass
+
+    estado_resultado = 'cancelado' if respuesta.codigo == '0422' else 'pendiente_cancelacion'
+    return {
+        "cdc": cdc,
+        "codigo_sifen": respuesta.codigo,
+        "descripcion": respuesta.descripcion,
+        "estado": estado_resultado,
+    }
 
 
 @router.get('/facturas/{cdc}/kude', summary="Descargar KuDE en PDF",
