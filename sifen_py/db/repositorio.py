@@ -222,8 +222,10 @@ class RepositorioDE:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, cdc, numero_doc, estado, codigo_sifen,
-                       protocolo_autorizacion, fecha_emision, fecha_envio, intentos
+                SELECT id, cdc, numero_doc, tipo_documento, estado, codigo_sifen,
+                       protocolo_autorizacion, ruc_receptor, razon_social_receptor,
+                       monto_total, fecha_emision, fecha_envio, intentos,
+                       data_json IS NOT NULL AS data_json
                 FROM documentos_electronicos
                 WHERE estado = %s
                 ORDER BY fecha_envio DESC
@@ -236,9 +238,11 @@ class RepositorioDE:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, cdc, numero_doc, estado, codigo_sifen,
+                SELECT id, cdc, numero_doc, tipo_documento, estado, codigo_sifen,
                        descripcion_sifen, protocolo_autorizacion,
-                       fecha_emision, fecha_envio, intentos
+                       ruc_receptor, razon_social_receptor, monto_total,
+                       fecha_emision, fecha_envio, intentos,
+                       data_json IS NOT NULL AS data_json
                 FROM documentos_electronicos
                 ORDER BY created_at DESC
                 LIMIT %s
