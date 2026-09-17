@@ -26,6 +26,9 @@ Thumbs.db
 soap_v*.xml
 de_firmado_debug.xml
 
+# Configuración local con credenciales — no subir al repo
+config.json
+
 # Python
 __pycache__/
 *.pyc

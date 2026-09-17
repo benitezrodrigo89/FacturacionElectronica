@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0 fw-semibold"><i class="bi bi-gear me-1"></i>Configuración del Emisor</h5>
+</div>
+
+{% if guardado %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <i class="bi bi-check-circle me-1"></i>Configuración guardada correctamente.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger">
+  <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+</div>
+{% endif %}
+
+<form method="post" action="/configuracion">
+
+  <!-- Datos del emisor -->
+  <div class="card mb-3">
+    <div class="card-header fw-semibold bg-primary text-white py-2">
+      <i class="bi bi-building me-1"></i>Datos del Emisor
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Ambiente <span class="text-danger">*</span></label>
+          <select name="ambiente" class="form-select">
+            <option value="test"  {% if cfg.ambiente == 'test'  %}selected{% endif %}>Prueba (test)</option>
+            <option value="prod"  {% if cfg.ambiente == 'prod'  %}selected{% endif %}>Producción</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">RUC <span class="text-danger">*</span></label>
+          <input type="text" name="ruc" class="form-control" value="{{ cfg.ruc }}" placeholder="1234567-8" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tipo Contribuyente</label>
+          <select name="tipo_contribuyente" class="form-select">
+            <option value="1" {% if cfg.tipo_contribuyente == 1 %}selected{% endif %}>Persona Física</option>
+            <option value="2" {% if cfg.tipo_contribuyente == 2 %}selected{% endif %}>Persona Jurídica</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Razón Social <span class="text-danger">*</span></label>
+          <input type="text" name="razon_social" class="form-control" value="{{ cfg.razon_social }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Nombre Fantasía</label>
+          <input type="text" name="nombre_fantasia" class="form-control" value="{{ cfg.nombre_fantasia }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Cód. Actividad Económica</label>
+          <input type="text" name="actividad_economica_codigo" class="form-control" value="{{ cfg.actividad_economica_codigo }}">
+        </div>
+        <div class="col-md-9">
+          <label class="form-label">Descripción Actividad Económica</label>
+          <input type="text" name="actividad_economica_descripcion" class="form-control" value="{{ cfg.actividad_economica_descripcion }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Dirección</label>
+          <input type="text" name="direccion" class="form-control" value="{{ cfg.direccion }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Teléfono</label>
+          <input type="text" name="telefono" class="form-control" value="{{ cfg.telefono }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ cfg.email }}">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Establecimiento -->
+  <div class="card mb-3">
+    <div class="card-header fw-semibold bg-secondary text-white py-2">
+      <i class="bi bi-geo-alt me-1"></i>Establecimiento y Ubicación
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label">Código Estab.</label>
+          <input type="text" name="establecimiento" class="form-control" value="{{ cfg.establecimiento }}" maxlength="3">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Denominación Establecimiento</label>
+          <input type="text" name="establecimiento_denominacion" class="form-control" value="{{ cfg.establecimiento_denominacion }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Punto Expedición</label>
+          <input type="text" name="punto_expedicion" class="form-control" value="{{ cfg.punto_expedicion }}" maxlength="3">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">N° Casa</label>
+          <input type="text" name="numero_casa" class="form-control" value="{{ cfg.numero_casa }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Departamento (cód)</label>
+          <input type="number" name="departamento" class="form-control" value="{{ cfg.departamento }}">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Descripción Departamento</label>
+          <input type="text" name="departamento_descripcion" class="form-control" value="{{ cfg.departamento_descripcion }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Distrito (cód)</label>
+          <input type="number" name="distrito" class="form-control" value="{{ cfg.distrito }}">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Descripción Distrito</label>
+          <input type="text" name="distrito_descripcion" class="form-control" value="{{ cfg.distrito_descripcion }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Ciudad (cód)</label>
+          <input type="number" name="ciudad" class="form-control" value="{{ cfg.ciudad }}">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Descripción Ciudad</label>
+          <input type="text" name="ciudad_descripcion" class="form-control" value="{{ cfg.ciudad_descripcion }}">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timbrado y seguridad -->
+  <div class="card mb-3">
+    <div class="card-header fw-semibold bg-dark text-white py-2">
+      <i class="bi bi-shield-lock me-1"></i>Timbrado y Certificado
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Número de Timbrado</label>
+          <input type="text" name="timbrado_numero" class="form-control" value="{{ cfg.timbrado_numero }}" maxlength="8">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Fecha de Inicio Timbrado</label>
+          <input type="date" name="timbrado_fecha" class="form-control" value="{{ cfg.timbrado_fecha }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">CSC ID</label>
+          <input type="text" name="csc_id" class="form-control" value="{{ cfg.csc_id }}" maxlength="4">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Código de Seguridad del Contribuyente (CSC) — 32 caracteres</label>
+          <input type="text" name="csc" class="form-control font-monospace" value="{{ cfg.csc }}" maxlength="32">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Ruta del Certificado (.pfx)</label>
+          <input type="text" name="certificado_path" class="form-control font-monospace" value="{{ cfg.certificado_path }}">
+          <div class="form-text">Ruta relativa a la carpeta <code>FacturacionElectronica/</code></div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Password del Certificado</label>
+          <input type="password" name="certificado_password" class="form-control" value="{{ cfg.certificado_password }}">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-save me-1"></i>Guardar Configuración
+    </button>
+    <a href="/" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+
+</form>
+
+<!-- API Keys (solo lectura) -->
+<div class="card mt-4">
+  <div class="card-header fw-semibold py-2">
+    <i class="bi bi-key me-1"></i>API Keys
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-2">
+      Claves de autenticación para terceros. Editá <code>config.json</code> para agregar o eliminar claves.
+    </p>
+    {% if cfg.api_keys %}
+      {% for key in cfg.api_keys %}
+      <code class="d-block bg-light border rounded px-3 py-2 mb-1 font-monospace small">{{ key }}</code>
+      {% endfor %}
+    {% else %}
+      <span class="text-muted small">Sin API Keys configuradas — todos los requests son permitidos.</span>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0 fw-semibold"><i class="bi bi-file-earmark-text me-1"></i>Documentos Electrónicos</h5>
+  <a href="/api/docs#/Facturas/emitir_factura_api_v1_facturas_post"
+     class="btn btn-primary btn-sm" target="_blank">
+    <i class="bi bi-plus-circle me-1"></i>Emitir vía API
+  </a>
+</div>
+
+<!-- Filtros -->
+<div class="btn-group mb-3" role="group" id="filtros">
+  <button class="btn btn-outline-secondary btn-sm active" id="btn-todos"
+          hx-get="/documentos-tabla"
+          hx-target="#content"
+          hx-swap="innerHTML"
+          hx-indicator="#spinner"
+          onclick="setActive(this)">
+    Todos
+  </button>
+  <button class="btn btn-outline-success btn-sm" id="btn-aprobado"
+          hx-get="/documentos-tabla?estado=aprobado"
+          hx-target="#content"
+          hx-swap="innerHTML"
+          hx-indicator="#spinner"
+          onclick="setActive(this)">
+    <i class="bi bi-check-circle me-1"></i>Aprobados
+  </button>
+  <button class="btn btn-outline-danger btn-sm" id="btn-rechazado"
+          hx-get="/documentos-tabla?estado=rechazado"
+          hx-target="#content"
+          hx-swap="innerHTML"
+          hx-indicator="#spinner"
+          onclick="setActive(this)">
+    <i class="bi bi-x-circle me-1"></i>Rechazados
+  </button>
+  <button class="btn btn-outline-warning btn-sm" id="btn-pendiente"
+          hx-get="/documentos-tabla?estado=pendiente"
+          hx-target="#content"
+          hx-swap="innerHTML"
+          hx-indicator="#spinner"
+          onclick="setActive(this)">
+    <i class="bi bi-clock me-1"></i>Pendientes
+  </button>
+</div>
+
+<span id="spinner" class="htmx-indicator spinner-border spinner-border-sm text-secondary ms-2"></span>
+
+<!-- Contenido cargado por HTMX -->
+<div id="content"
+     hx-get="/documentos-tabla"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+  <div class="text-center py-5 text-muted">
+    <div class="spinner-border spinner-border-sm"></div> Cargando...
+  </div>
+</div>
+
+<script>
+function setActive(btn) {
+  document.querySelectorAll('#filtros button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}

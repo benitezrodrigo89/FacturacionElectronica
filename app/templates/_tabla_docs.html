@@ -1,0 +1,100 @@
+{% if error %}
+<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>
+{% else %}
+
+<!-- Tarjetas de resumen -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="stat-number text-success">{{ resumen.get('aprobado', 0) }}</div>
+      <div class="small text-muted mt-1">Aprobados</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="stat-number text-danger">{{ resumen.get('rechazado', 0) }}</div>
+      <div class="small text-muted mt-1">Rechazados</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="stat-number text-warning">{{ resumen.get('pendiente', 0) }}</div>
+      <div class="small text-muted mt-1">Pendientes</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="stat-number text-primary">{{ resumen.values() | sum }}</div>
+      <div class="small text-muted mt-1">Total</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+  <div class="card-body p-0">
+    {% if docs %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">#Doc</th>
+            <th>Fecha</th>
+            <th>Receptor</th>
+            <th class="text-end">Monto</th>
+            <th>Estado</th>
+            <th>CDC</th>
+            <th class="text-center">KuDE</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in docs %}
+          <tr>
+            <td class="ps-3 text-muted fw-semibold">{{ doc.numero_doc }}</td>
+            <td class="text-nowrap small">
+              {{ doc.fecha_envio.strftime('%d/%m/%Y %H:%M') if doc.fecha_envio else '—' }}
+            </td>
+            <td>
+              <div class="small fw-semibold">{{ doc.razon_social_receptor or '—' }}</div>
+              <div class="small text-muted">{{ doc.ruc_receptor or '' }}</div>
+            </td>
+            <td class="text-end text-nowrap">
+              {% if doc.monto_total %}
+                <span class="fw-semibold">₲ {{ "{:,}".format(doc.monto_total | int).replace(',', '.') }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if doc.estado == 'aprobado' %}
+                <span class="badge badge-aprobado rounded-pill">Aprobado</span>
+              {% elif doc.estado == 'rechazado' %}
+                <span class="badge badge-rechazado rounded-pill">Rechazado</span>
+              {% else %}
+                <span class="badge badge-pendiente rounded-pill">Pendiente</span>
+              {% endif %}
+            </td>
+            <td><code class="cdc">{{ doc.cdc[:16] }}…</code></td>
+            <td class="text-center">
+              {% if doc.data_json %}
+              <a href="/api/v1/facturas/{{ doc.cdc }}/kude"
+                 class="btn btn-outline-primary btn-sm"
+                 title="Descargar KuDE PDF">
+                <i class="bi bi-file-earmark-pdf"></i>
+              </a>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+      No hay documentos{% if estado_filtro %} con estado <strong>{{ estado_filtro }}</strong>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
