@@ -57,6 +57,37 @@ class CancelacionRequest(BaseModel):
     motivo: str = Field(min_length=5, description="Motivo de la cancelación")
 
 
+class MotivoNCE(IntEnum):
+    DEVOLUCION_Y_AJUSTE  = 1
+    DEVOLUCION           = 2
+    DESCUENTO            = 3
+    BONIFICACION         = 4
+    CREDITO_INCOBRABLE   = 5
+    RECUPERO_COSTO       = 6
+    RECUPERO_GASTO       = 7
+    OTROS                = 8
+
+
+class DocumentoReferencia(BaseModel):
+    cdc:             str
+    timbrado:        Optional[str] = None
+    establecimiento: Optional[str] = None
+    punto:           Optional[str] = None
+    numero:          Optional[int] = None
+    fecha:           Optional[str] = Field(default=None, description="Formato YYYY-MM-DD")
+
+
+class NotaCreditoRequest(BaseModel):
+    receptor:              ReceptorRequest
+    items:                 List[ItemRequest] = Field(min_length=1)
+    condicion_pago:        CondicionPagoRequest  = CondicionPagoRequest()
+    motivo:                MotivoNCE             = MotivoNCE.OTROS
+    documento_referencia:  Optional[DocumentoReferencia] = Field(
+        default=None, description="Factura original que se está acreditando"
+    )
+    descripcion:           Optional[str] = None
+
+
 class FacturaResponse(BaseModel):
     cdc: str
     numero_doc: int

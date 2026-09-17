@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.facturas import router as facturas_router
 from app.api.consultas import router as consultas_router
+from app.api.notas import router as notas_router
 from app.web.dashboard import router as dashboard_router
 from app.web.configuracion import router as config_router
 
@@ -43,6 +44,7 @@ app.add_middleware(
 )
 
 app.include_router(facturas_router)
+app.include_router(notas_router)
 app.include_router(consultas_router)
 app.include_router(dashboard_router)
 app.include_router(config_router)
