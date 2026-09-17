@@ -23,6 +23,7 @@ from app.api.consultas import router as consultas_router
 from app.api.notas import router as notas_router
 from app.web.dashboard import router as dashboard_router
 from app.web.configuracion import router as config_router
+from app.web.emision import router as emision_router
 
 app = FastAPI(
     title="SIFEN Paraguay — Facturación Electrónica",
@@ -48,6 +49,7 @@ app.include_router(notas_router)
 app.include_router(consultas_router)
 app.include_router(dashboard_router)
 app.include_router(config_router)
+app.include_router(emision_router)
 
 static_dir = Path(__file__).parent / 'static'
 static_dir.mkdir(exist_ok=True)

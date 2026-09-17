@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+<input type="hidden" id="api-key" value="{{ api_key }}">
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0 fw-semibold"><i class="bi bi-truck me-1"></i>Nueva Nota de Remisión (NRE)</h5>
+  <a href="/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+</div>
+
+<!-- Receptor -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-primary text-white">
+    <i class="bi bi-person me-1"></i>Destinatario
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">RUC <span class="text-danger">*</span></label>
+        <input type="text" id="ruc" class="form-control" placeholder="1234567-8" required>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Razón Social <span class="text-danger">*</span></label>
+        <input type="text" id="razon_social" class="form-control" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Dirección</label>
+        <input type="text" id="direccion" class="form-control">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Remisión -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-secondary text-white">
+    <i class="bi bi-geo-alt me-1"></i>Datos del Traslado
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Motivo de Remisión <span class="text-danger">*</span></label>
+        <select id="motivo" class="form-select">
+          <option value="1">1 — Traslado entre locales del emisor</option>
+          <option value="2">2 — Traslado a terceros</option>
+          <option value="3">3 — Exportación</option>
+          <option value="4">4 — Consignación</option>
+          <option value="5">5 — Devolución</option>
+          <option value="9" selected>9 — Otros</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Descripción (opcional)</label>
+        <input type="text" id="descripcion" class="form-control" placeholder="Nota de remisión de mercaderías">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Dirección de Origen</label>
+        <input type="text" id="origen" class="form-control" placeholder="Ej: Depósito Central, Asuncion">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Dirección de Destino</label>
+        <input type="text" id="destino" class="form-control" placeholder="Ej: Sucursal Norte, San Lorenzo">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Transportista -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2">
+    <i class="bi bi-truck me-1"></i>Transportista (opcional)
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Nombre del Transportista</label>
+        <input type="text" id="transp-nombre" class="form-control">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">N° Documento del Transportista</label>
+        <input type="text" id="transp-doc" class="form-control" placeholder="Cédula o RUC">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Matrícula</label>
+        <input type="text" id="vehiculo-matricula" class="form-control" placeholder="ABC123">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Marca</label>
+        <input type="text" id="vehiculo-marca" class="form-control" placeholder="Toyota">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ítems -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-dark text-white d-flex justify-content-between">
+    <span><i class="bi bi-box me-1"></i>Mercaderías</span>
+    <button type="button" class="btn btn-sm btn-light" onclick="addItem(false)">
+      <i class="bi bi-plus-circle me-1"></i>Agregar ítem
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:80px">Código</th>
+            <th>Descripción</th>
+            <th style="width:100px">Cantidad</th>
+            <th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="resultado"></div>
+
+<div class="d-flex gap-2 mt-3">
+  <button type="button" id="btn-emitir" class="btn btn-secondary" onclick="submitNRE()">
+    <i class="bi bi-send me-1"></i>Emitir
+  </button>
+  <a href="/" class="btn btn-outline-secondary">Cancelar</a>
+</div>
+
+<script src="/static/emision.js"></script>
+<script>
+  addItem(false);
+
+  function submitNRE() {
+    const items = getItems(false);
+    if (!items.length) { alert('Agregá al menos un ítem.'); return; }
+    if (!document.getElementById('ruc').value.trim()) { alert('El RUC es obligatorio.'); return; }
+    if (!document.getElementById('razon_social').value.trim()) { alert('La razón social es obligatoria.'); return; }
+
+    const nombre = document.getElementById('transp-nombre').value.trim();
+    const doc    = document.getElementById('transp-doc').value.trim();
+    const matr   = document.getElementById('vehiculo-matricula').value.trim();
+    const marca  = document.getElementById('vehiculo-marca').value.trim();
+
+    const payload = {
+      receptor: {
+        ruc:          document.getElementById('ruc').value.trim(),
+        razon_social: document.getElementById('razon_social').value.trim(),
+        direccion:    document.getElementById('direccion').value.trim() || null,
+      },
+      items: items.map(i => ({ descripcion: i.descripcion, cantidad: i.cantidad, codigo: i.codigo })),
+      motivo:            parseInt(document.getElementById('motivo').value),
+      descripcion:       document.getElementById('descripcion').value.trim() || null,
+      direccion_origen:  document.getElementById('origen').value.trim() || null,
+      direccion_destino: document.getElementById('destino').value.trim() || null,
+    };
+
+    if (nombre && doc) {
+      payload.transportista = {
+        nombre,
+        documento_numero: doc,
+        vehiculo: matr ? { matricula: matr, marca: marca || null } : null,
+      };
+    }
+
+    enviarAPI('/api/v1/notas-remision', payload);
+  }
+</script>
+{% endblock %}

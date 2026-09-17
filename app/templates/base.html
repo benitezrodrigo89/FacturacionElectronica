@@ -31,6 +31,32 @@
       <a href="/" class="nav-link text-white {% if request.url.path == '/' %}active{% endif %}">
         <i class="bi bi-grid-1x2"></i> Dashboard
       </a>
+
+      <!-- Dropdown Emitir -->
+      <div class="dropdown">
+        <a class="nav-link text-white dropdown-toggle {% if '/emitir/' in request.url.path %}active{% endif %}"
+           href="#" role="button" data-bs-toggle="dropdown">
+          <i class="bi bi-plus-circle"></i> Emitir
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li>
+            <a class="dropdown-item" href="/emitir/factura">
+              <span class="badge bg-primary me-2">FE</span>Factura Electrónica
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="/emitir/nota-credito">
+              <span class="badge bg-warning text-dark me-2">NCE</span>Nota de Crédito
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="/emitir/nota-remision">
+              <span class="badge bg-secondary me-2">NRE</span>Nota de Remisión
+            </a>
+          </li>
+        </ul>
+      </div>
+
       <a href="/configuracion" class="nav-link text-white {% if request.url.path == '/configuracion' %}active{% endif %}">
         <i class="bi bi-gear"></i> Configuración
       </a>
