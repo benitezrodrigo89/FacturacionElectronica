@@ -8,13 +8,17 @@ from fastapi.responses import Response
 from sifen_py.services.xml_wrapper import XMLGeneratorWrapper
 from sifen_py.services.signer import XMLSigner
 from sifen_py.services.soap_client import SifenSOAPClient
+from sifen_py.events.gestor_eventos import GestorEventos
 from sifen_py.generators.kude import KuDEGenerator
 from sifen_py.db.conexion import Conexion
 from sifen_py.db.repositorio import RepositorioDE
 
 from app.config_manager import get_sifen_config, load_config
 from app.api.auth import require_api_key
-from app.api.schemas import FacturaRequest, FacturaResponse, CancelacionRequest, InutilizacionRequest
+from app.api.schemas import (
+    FacturaRequest, FacturaResponse,
+    CancelacionRequest, InutilizacionRequest, ConformidadRequest,
+)
 
 router = APIRouter(prefix='/api/v1', tags=['Facturas'])
 
@@ -236,26 +240,11 @@ async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depen
 
     sifen_config = get_sifen_config()
 
-    # Generar XML del evento de cancelación
     try:
-        wrapper = XMLGeneratorWrapper(sifen_config)
-        xml_evento = wrapper.generar_xml_evento_cancelacion(cdc, body.motivo)
+        gestor = GestorEventos(sifen_config)
+        respuesta = gestor.cancelar(cdc=cdc, motivo=body.motivo)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generando evento: {e}")
-
-    # Firmar el evento
-    try:
-        signer = XMLSigner(sifen_config)
-        xml_evento_firmado = signer.firmar_xml(xml_evento)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error firmando evento: {e}")
-
-    # Enviar a SIFEN
-    try:
-        client = SifenSOAPClient(sifen_config)
-        respuesta = client.enviar_evento_directo(xml_evento_firmado)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error enviando evento a SIFEN: {e}")
+        raise HTTPException(status_code=500, detail=f"Error procesando cancelación: {e}")
 
     # Actualizar BD
     try:
@@ -296,10 +285,9 @@ async def inutilizar_numeracion(req: InutilizacionRequest, _key: str = Depends(r
     cfg          = load_config()
     sifen_config = get_sifen_config()
 
-    # Generar XML del evento de inutilización
     try:
-        wrapper   = XMLGeneratorWrapper(sifen_config)
-        xml_evento = wrapper.generar_xml_evento_inutilizacion(
+        gestor    = GestorEventos(sifen_config)
+        respuesta = gestor.inutilizar(
             tipo_documento=req.tipo_documento,
             establecimiento=cfg['establecimiento'],
             punto=cfg['punto_expedicion'],
@@ -308,21 +296,7 @@ async def inutilizar_numeracion(req: InutilizacionRequest, _key: str = Depends(r
             motivo=req.motivo,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generando evento: {e}")
-
-    # Firmar el evento
-    try:
-        signer          = XMLSigner(sifen_config)
-        xml_evento_firmado = signer.firmar_xml(xml_evento)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error firmando evento: {e}")
-
-    # Enviar a SIFEN
-    try:
-        client    = SifenSOAPClient(sifen_config)
-        respuesta = client.enviar_evento_directo(xml_evento_firmado)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error enviando a SIFEN: {e}")
+        raise HTTPException(status_code=500, detail=f"Error procesando inutilización: {e}")
 
     # Marcar en BD los documentos del rango que existan
     docs_actualizados = 0
@@ -346,6 +320,35 @@ async def inutilizar_numeracion(req: InutilizacionRequest, _key: str = Depends(r
         "codigo_sifen":        respuesta.codigo,
         "descripcion":         respuesta.descripcion,
         "docs_actualizados_bd": docs_actualizados,
+    }
+
+
+@router.post('/documentos/{cdc}/conformidad', summary="Registrar conformidad de un documento recibido")
+async def registrar_conformidad(cdc: str, body: ConformidadRequest, _key: str = Depends(require_api_key)):
+    """
+    El receptor informa a la SET que recibió el documento (conformidad total o parcial).
+    Aplica a documentos que el emisor te envió y ya recibiste.
+    """
+    if len(cdc) != 44:
+        raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
+
+    sifen_config = get_sifen_config()
+
+    try:
+        gestor    = GestorEventos(sifen_config)
+        respuesta = gestor.conformidad(
+            cdc=cdc,
+            tipo_conformidad=body.tipo_conformidad,
+            fecha_recepcion=body.fecha_recepcion,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error procesando conformidad: {e}")
+
+    return {
+        "cdc":          cdc,
+        "codigo_sifen": respuesta.codigo,
+        "descripcion":  respuesta.descripcion,
+        "estado":       "conformidad_registrada" if respuesta.exitoso else "error",
     }
 
 

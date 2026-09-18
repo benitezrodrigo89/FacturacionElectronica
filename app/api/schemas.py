@@ -64,6 +64,17 @@ class InutilizacionRequest(BaseModel):
     motivo:         str = Field(min_length=5, description="Motivo de la inutilización")
 
 
+class ConformidadRequest(BaseModel):
+    tipo_conformidad: int = Field(
+        default=1,
+        ge=1, le=2,
+        description="1=Conformidad total, 2=Conformidad parcial",
+    )
+    fecha_recepcion: str = Field(
+        description="Fecha y hora de recepción en formato ISO 8601, ej: 2026-09-18T10:00:00"
+    )
+
+
 class MotivoNCE(IntEnum):
     DEVOLUCION_Y_AJUSTE  = 1
     DEVOLUCION           = 2

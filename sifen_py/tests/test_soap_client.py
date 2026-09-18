@@ -398,3 +398,281 @@ class TestEsperarProcesamientoLote:
             with patch('time.sleep'):
                 r = client.esperar_procesamiento_lote('LOTE1', intentos=5, espera_seg=0)
                 assert r.codigo == '0362'
+
+
+# ─── _parsear_respuesta_consulta_de_xml ──────────────────────────────────────
+
+class TestParsearRespuestaConsultaDeXml:
+    _XML_APROBADO = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+        b'<env:Body>'
+        b'<rRetConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+        b'<rProtDe>'
+        b'<Id>01080069563001001000000120260115000000000018</Id>'
+        b'<dEstRes>Aprobado</dEstRes>'
+        b'<dProtAut>50017901</dProtAut>'
+        b'<dCodRes>0422</dCodRes>'
+        b'<dMsgRes>DE aprobado</dMsgRes>'
+        b'<dEstDE>Aprobado</dEstDE>'
+        b'<dFecProc>2026-01-15T10:30:00</dFecProc>'
+        b'</rProtDe>'
+        b'</rRetConsDE>'
+        b'</env:Body>'
+        b'</env:Envelope>'
+    )
+
+    _XML_NO_EXISTE = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+        b'<env:Body>'
+        b'<rRetConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+        b'<rProtDe>'
+        b'<dCodRes>0420</dCodRes>'
+        b'<dMsgRes>DE no existe</dMsgRes>'
+        b'</rProtDe>'
+        b'</rRetConsDE>'
+        b'</env:Body>'
+        b'</env:Envelope>'
+    )
+
+    @pytest.fixture
+    def client(self, config_test):
+        with patch('sifen_py.services.soap_client.ZEEP_AVAILABLE', True):
+            return SifenSOAPClient(config_test)
+
+    def test_parsea_codigo_0422(self, client):
+        r = client._parsear_respuesta_consulta_de_xml(self._XML_APROBADO)
+        assert r.codigo == '0422'
+
+    def test_parsea_protocolo_autorizacion(self, client):
+        r = client._parsear_respuesta_consulta_de_xml(self._XML_APROBADO)
+        assert r.raw.get('protocolo') == '50017901'
+
+    def test_parsea_cdc_del_id(self, client):
+        r = client._parsear_respuesta_consulta_de_xml(self._XML_APROBADO)
+        assert r.raw.get('cdc') == '01080069563001001000000120260115000000000018'
+
+    def test_parsea_estado_de(self, client):
+        r = client._parsear_respuesta_consulta_de_xml(self._XML_APROBADO)
+        assert 'aprobado' in r.raw.get('estado', '').lower()
+
+    def test_codigo_0420_no_exitoso(self, client):
+        r = client._parsear_respuesta_consulta_de_xml(self._XML_NO_EXISTE)
+        assert r.codigo == '0420'
+
+    def test_xml_invalido_retorna_err(self, client):
+        r = client._parsear_respuesta_consulta_de_xml(b'not xml at all')
+        assert r.codigo == 'ERR'
+
+
+# ─── _parsear_respuesta_evento_xml ───────────────────────────────────────────
+
+class TestParsearRespuestaEventoXml:
+    _XML_OK = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+        b'<env:Body>'
+        b'<rRetEnviEvento xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+        b'<dCodRes>0300</dCodRes>'
+        b'<dMsgRes>Evento recibido</dMsgRes>'
+        b'</rRetEnviEvento>'
+        b'</env:Body>'
+        b'</env:Envelope>'
+    )
+
+    _XML_FAULT = (
+        b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+        b'<env:Body>'
+        b'<env:Fault>'
+        b'<env:Code><env:Value>env:Sender</env:Value></env:Code>'
+        b'<env:Text>Access denied</env:Text>'
+        b'</env:Fault>'
+        b'</env:Body>'
+        b'</env:Envelope>'
+    )
+
+    @pytest.fixture
+    def client(self, config_test):
+        with patch('sifen_py.services.soap_client.ZEEP_AVAILABLE', True):
+            return SifenSOAPClient(config_test)
+
+    def test_parsea_codigo_0300(self, client):
+        r = client._parsear_respuesta_evento_xml(self._XML_OK)
+        assert r.codigo == '0300'
+
+    def test_parsea_descripcion(self, client):
+        r = client._parsear_respuesta_evento_xml(self._XML_OK)
+        assert 'recibido' in r.descripcion.lower()
+
+    def test_soap_fault_retorna_err(self, client):
+        r = client._parsear_respuesta_evento_xml(self._XML_FAULT)
+        assert r.codigo == 'ERR'
+
+    def test_xml_invalido_retorna_err(self, client):
+        r = client._parsear_respuesta_evento_xml(b'garbage')
+        assert r.codigo == 'ERR'
+
+
+# ─── consultar_de_directo — validación de CDC ─────────────────────────────────
+
+class TestConsultarDeDirecto:
+    @pytest.fixture
+    def client(self, config_test):
+        with patch('sifen_py.services.soap_client.ZEEP_AVAILABLE', True):
+            return SifenSOAPClient(config_test)
+
+    def test_cdc_corto_lanza_excepcion(self, client):
+        with pytest.raises(SOAPException, match='CDC inválido'):
+            client.consultar_de_directo('1' * 43)
+
+    def test_cdc_largo_lanza_excepcion(self, client):
+        with pytest.raises(SOAPException, match='CDC inválido'):
+            client.consultar_de_directo('1' * 45)
+
+    def test_cdc_vacio_lanza_excepcion(self, client):
+        with pytest.raises(SOAPException, match='CDC inválido'):
+            client.consultar_de_directo('')
+
+    def test_cdc_valido_hace_post_http(self, client, cdc_valido):
+        mock_session = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = (
+            b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            b'<env:Body>'
+            b'<rRetConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            b'<rProtDe><dCodRes>0422</dCodRes><dMsgRes>OK</dMsgRes></rProtDe>'
+            b'</rRetConsDE></env:Body></env:Envelope>'
+        )
+        mock_session.post.return_value = mock_resp
+        with patch.object(client, '_get_session', return_value=mock_session):
+            r = client.consultar_de_directo(cdc_valido)
+        mock_session.post.assert_called_once()
+        assert r.codigo == '0422'
+
+    def test_error_http_lanza_soap_exception(self, client, cdc_valido):
+        mock_session = MagicMock()
+        mock_session.post.side_effect = Exception('timeout')
+        with patch.object(client, '_get_session', return_value=mock_session):
+            with pytest.raises(SOAPException, match='Error HTTP'):
+                client.consultar_de_directo(cdc_valido)
+
+
+# ─── consultar_ruc_directo ────────────────────────────────────────────────────
+
+class TestConsultarRucDirecto:
+    @pytest.fixture
+    def client(self, config_test):
+        with patch('sifen_py.services.soap_client.ZEEP_AVAILABLE', True):
+            return SifenSOAPClient(config_test)
+
+    def _mock_session(self, xml_bytes: bytes):
+        session = MagicMock()
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.content = xml_bytes
+        session.post.return_value = resp
+        return session
+
+    def test_normaliza_ruc_con_guion(self, client):
+        xml = (
+            b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            b'<env:Body><rRetConsRUC xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            b'<dCodRes>0422</dCodRes><dMsgRes>RUC encontrado</dMsgRes>'
+            b'</rRetConsRUC></env:Body></env:Envelope>'
+        )
+        mock_session = self._mock_session(xml)
+        with patch.object(client, '_get_session', return_value=mock_session):
+            client.consultar_ruc_directo('5722781-0')
+        # Verificar que el envelope no tiene guion en el RUC
+        call_data = mock_session.post.call_args[1].get('data') or mock_session.post.call_args[0][1]
+        assert b'57227810' in call_data
+        assert b'5722781-0' not in call_data
+
+    def test_hace_post_http(self, client):
+        xml = b'<r/>'
+        mock_session = MagicMock()
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.content = xml
+        mock_session.post.return_value = resp
+        with patch.object(client, '_get_session', return_value=mock_session):
+            with patch.object(client, '_parsear_respuesta_xml') as mock_parsear:
+                mock_parsear.return_value = RespuestaSIFEN('0422', 'OK')
+                client.consultar_ruc_directo('80069563-1')
+        mock_session.post.assert_called_once()
+
+    def test_error_http_lanza_soap_exception(self, client):
+        mock_session = MagicMock()
+        mock_session.post.side_effect = Exception('conn refused')
+        with patch.object(client, '_get_session', return_value=mock_session):
+            with pytest.raises(SOAPException, match='Error HTTP'):
+                client.consultar_ruc_directo('80069563-1')
+
+
+# ─── enviar_de_directo ────────────────────────────────────────────────────────
+
+class TestEnviarDeDirecto:
+    @pytest.fixture
+    def client(self, config_test):
+        with patch('sifen_py.services.soap_client.ZEEP_AVAILABLE', True):
+            return SifenSOAPClient(config_test)
+
+    def test_hace_post_al_endpoint(self, client):
+        mock_session = MagicMock()
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.content = (
+            b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            b'<env:Body>'
+            b'<rRetEnviDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            b'<rProtDe><dCodRes>0260</dCodRes><dMsgRes>Aprobado</dMsgRes></rProtDe>'
+            b'</rRetEnviDe></env:Body></env:Envelope>'
+        )
+        mock_session.post.return_value = resp
+        with patch.object(client, '_get_session', return_value=mock_session):
+            r = client.enviar_de_directo('<rDE>...</rDE>')
+        mock_session.post.assert_called_once()
+
+    def test_error_http_lanza_soap_exception(self, client):
+        mock_session = MagicMock()
+        mock_session.post.side_effect = Exception('timeout')
+        with patch.object(client, '_get_session', return_value=mock_session):
+            with pytest.raises(SOAPException, match='Error HTTP'):
+                client.enviar_de_directo('<rDE/>')
+
+
+# ─── enviar_evento_directo ────────────────────────────────────────────────────
+
+class TestEnviarEventoDirecto:
+    @pytest.fixture
+    def client(self, config_test):
+        with patch('sifen_py.services.soap_client.ZEEP_AVAILABLE', True):
+            return SifenSOAPClient(config_test)
+
+    def test_hace_post_al_endpoint_evento(self, client):
+        mock_session = MagicMock()
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.content = (
+            b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            b'<env:Body>'
+            b'<r xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            b'<dCodRes>0300</dCodRes><dMsgRes>Evento recibido</dMsgRes>'
+            b'</r></env:Body></env:Envelope>'
+        )
+        mock_session.post.return_value = resp
+        with patch.object(client, '_get_session', return_value=mock_session):
+            r = client.enviar_evento_directo('<evento/>')
+        mock_session.post.assert_called_once()
+        # Verifica que el envelope contiene el xml del evento
+        call_data = mock_session.post.call_args[1].get('data') or mock_session.post.call_args[0][1]
+        assert b'<evento/>' in call_data
+
+    def test_error_http_lanza_soap_exception(self, client):
+        mock_session = MagicMock()
+        mock_session.post.side_effect = Exception('refused')
+        with patch.object(client, '_get_session', return_value=mock_session):
+            with pytest.raises(SOAPException, match='Error HTTP'):
+                client.enviar_evento_directo('<evento/>')
