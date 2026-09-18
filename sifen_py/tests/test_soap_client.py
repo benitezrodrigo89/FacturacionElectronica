@@ -403,21 +403,17 @@ class TestEsperarProcesamientoLote:
 # ─── _parsear_respuesta_consulta_de_xml ──────────────────────────────────────
 
 class TestParsearRespuestaConsultaDeXml:
+    # Schema XML 10: resConsDE_v150.xsd — raíz rResEnviConsDe (Manual Técnico §9.4.3)
     _XML_APROBADO = (
         b'<?xml version="1.0" encoding="UTF-8"?>'
         b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
         b'<env:Body>'
-        b'<rRetConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
-        b'<rProtDe>'
-        b'<Id>01080069563001001000000120260115000000000018</Id>'
-        b'<dEstRes>Aprobado</dEstRes>'
-        b'<dProtAut>50017901</dProtAut>'
-        b'<dCodRes>0422</dCodRes>'
-        b'<dMsgRes>DE aprobado</dMsgRes>'
-        b'<dEstDE>Aprobado</dEstDE>'
+        b'<rResEnviConsDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
         b'<dFecProc>2026-01-15T10:30:00</dFecProc>'
-        b'</rProtDe>'
-        b'</rRetConsDE>'
+        b'<dCodRes>0422</dCodRes>'
+        b'<dMsgRes>CDC encontrado</dMsgRes>'
+        b'<xContenDE><rContDe><dProtAut>50017901</dProtAut></rContDe></xContenDE>'
+        b'</rResEnviConsDe>'
         b'</env:Body>'
         b'</env:Envelope>'
     )
@@ -426,12 +422,10 @@ class TestParsearRespuestaConsultaDeXml:
         b'<?xml version="1.0" encoding="UTF-8"?>'
         b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
         b'<env:Body>'
-        b'<rRetConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
-        b'<rProtDe>'
+        b'<rResEnviConsDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
         b'<dCodRes>0420</dCodRes>'
-        b'<dMsgRes>DE no existe</dMsgRes>'
-        b'</rProtDe>'
-        b'</rRetConsDE>'
+        b'<dMsgRes>CDC inexistente</dMsgRes>'
+        b'</rResEnviConsDe>'
         b'</env:Body>'
         b'</env:Envelope>'
     )
@@ -449,15 +443,11 @@ class TestParsearRespuestaConsultaDeXml:
         r = client._parsear_respuesta_consulta_de_xml(self._XML_APROBADO)
         assert r.raw.get('protocolo') == '50017901'
 
-    def test_parsea_cdc_del_id(self, client):
-        r = client._parsear_respuesta_consulta_de_xml(self._XML_APROBADO)
-        assert r.raw.get('cdc') == '01080069563001001000000120260115000000000018'
-
-    def test_parsea_estado_de(self, client):
+    def test_parsea_estado_aprobado(self, client):
         r = client._parsear_respuesta_consulta_de_xml(self._XML_APROBADO)
         assert 'aprobado' in r.raw.get('estado', '').lower()
 
-    def test_codigo_0420_no_exitoso(self, client):
+    def test_codigo_0420(self, client):
         r = client._parsear_respuesta_consulta_de_xml(self._XML_NO_EXISTE)
         assert r.codigo == '0420'
 

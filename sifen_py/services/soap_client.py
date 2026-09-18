@@ -251,10 +251,10 @@ class SifenSOAPClient:
             '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
             '<env:Header/>'
             '<env:Body>'
-            '<rConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<rEnviConsDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
             '<dId>1</dId>'
             f'<dCDC>{cdc}</dCDC>'
-            '</rConsDE>'
+            '</rEnviConsDe>'
             '</env:Body>'
             '</env:Envelope>'
         )
@@ -292,10 +292,10 @@ class SifenSOAPClient:
             '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
             '<env:Header/>'
             '<env:Body>'
-            '<rConsRUC xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<rEnviConsRUC xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
             '<dId>1</dId>'
             f'<dRUCCons>{ruc_limpio}</dRUCCons>'
-            '</rConsRUC>'
+            '</rEnviConsRUC>'
             '</env:Body>'
             '</env:Envelope>'
         )
@@ -729,48 +729,42 @@ class SifenSOAPClient:
 
     def _parsear_respuesta_consulta_de_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:
         """
-        Parsea la respuesta SOAP de rRetConsDE (consulta por CDC).
+        Parsea la respuesta SOAP de rResEnviConsDe (consulta por CDC).
+        Schema XML 10: resConsDE_v150.xsd
 
-        La respuesta aprobada incluye:
+        Respuesta exitosa (0422):
             dCodRes  = 0422
-            dMsgRes  = 'DE aprobado'
-            dProtAut = número de protocolo de autorización
-            dEstDE   = 'Aprobado'
-            dFecProc = fecha de procesamiento
+            dMsgRes  = 'CDC encontrado'
+            xContenDE/rContDe/dProtAut = protocolo de autorización
         """
         try:
             root = etree.fromstring(xml_bytes)
             ns   = 'http://ekuatia.set.gov.py/sifen/xsd'
 
-            prot = root.find('.//{%s}rProtDe' % ns)
-            if prot is None:
-                # Respuesta de error sin rProtDe (ej. 0160 desde DataPower)
-                return self._parsear_respuesta_xml(xml_bytes)
-
-            def _text(tag):
-                el = prot.find('.//{%s}%s' % (ns, tag))
+            def _txt(tag):
+                el = root.find('.//{%s}%s' % (ns, tag))
                 return el.text.strip() if el is not None and el.text else ''
 
-            codigo   = _text('dCodRes')
-            desc     = _text('dMsgRes')
-            estado   = _text('dEstDE') or _text('dEstRes')
-            protocolo = _text('dProtAut')
-            cdc      = _text('Id')
-            fecha    = _text('dFecProc')
+            codigo    = _txt('dCodRes')
+            desc      = _txt('dMsgRes')
+            protocolo = _txt('dProtAut')   # dentro de xContenDE/rContDe
+            fecha     = _txt('dFecProc')
+
+            if not codigo:
+                return self._parsear_respuesta_xml(xml_bytes)
 
             raw = {
                 'xml':       xml_bytes.decode('utf-8', errors='replace'),
-                'cdc':       cdc,
-                'estado':    estado,
                 'protocolo': protocolo,
                 'fecha':     fecha,
+                'estado':    'Aprobado' if codigo == '0422' else '',
             }
 
             resp = RespuestaSIFEN(codigo, desc, raw)
             if protocolo:
-                logger.success(f"CDC consultado: {cdc} | Estado: {estado} | Protocolo: {protocolo}")
+                logger.success(f"Consulta DE — código: {codigo} | Protocolo: {protocolo}")
             else:
-                logger.info(f"CDC consultado: {cdc} | Estado: {estado} | Código: {codigo}")
+                logger.info(f"Consulta DE — código: {codigo} | {desc}")
             return resp
         except Exception as e:
             logger.error(f"Error parseando respuesta consulta DE: {e}")
