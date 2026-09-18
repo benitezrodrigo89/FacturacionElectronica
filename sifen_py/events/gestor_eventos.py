@@ -47,7 +47,7 @@ class GestorEventos:
         """
         xml_evento  = self.wrapper.generar_xml_evento_cancelacion(cdc, motivo)
         xml_firmado = self.signer.firmar_xml(xml_evento)
-        return self.client.enviar_evento_soap(xml_firmado)
+        return self.client.enviar_evento_directo(xml_firmado)
 
     def inutilizar(
         self,
@@ -81,7 +81,7 @@ class GestorEventos:
             motivo=motivo,
         )
         xml_firmado = self.signer.firmar_xml(xml_evento)
-        return self.client.enviar_evento_soap(xml_firmado)
+        return self.client.enviar_evento_directo(xml_firmado)
 
     def conformidad(
         self,
@@ -106,4 +106,4 @@ class GestorEventos:
             fecha_recepcion=fecha_recepcion,
         )
         xml_firmado = self.signer.firmar_xml(xml_evento)
-        return self.client.enviar_evento_soap(xml_firmado)
+        return self.client.enviar_evento_directo(xml_firmado)

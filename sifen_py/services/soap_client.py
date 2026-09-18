@@ -646,10 +646,11 @@ class SifenSOAPClient:
     def enviar_evento_directo(self, xml_evento_firmado: str) -> RespuestaSIFEN:
         """
         Envía un evento firmado via HTTP POST directo (sin zeep/WSDL).
-        Mismo patrón que enviar_de_directo — funciona desde cualquier IP.
+        Mismo patrón que enviar_de_directo: construye el envelope por
+        concatenación de strings para preservar exactamente el XML firmado.
 
         Args:
-            xml_evento_firmado: XML del evento firmado (cancelación, inutilización, etc.)
+            xml_evento_firmado: <gGroupGesEve> firmado (sin envelope SOAP)
 
         Returns:
             RespuestaSIFEN con el resultado
@@ -659,10 +660,10 @@ class SifenSOAPClient:
             '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
             '<env:Header/>'
             '<env:Body>'
-            '<rRecepcionEvento xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<rEnviEventoDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
             '<dId>1</dId>'
-            f'<xEvento>{xml_evento_firmado}</xEvento>'
-            '</rRecepcionEvento>'
+            f'<dEvReg>{xml_evento_firmado}</dEvReg>'
+            '</rEnviEventoDe>'
             '</env:Body>'
             '</env:Envelope>'
         )
@@ -674,6 +675,7 @@ class SifenSOAPClient:
             'SOAPAction':   '',
         }
         logger.info(f"Enviando evento directo a: {url}")
+        logger.debug(f"Evento envelope (primeros 1500 chars):\n{envelope[:1500].decode('ascii', errors='replace')}")
         try:
             resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
         except Exception as e:
@@ -683,6 +685,7 @@ class SifenSOAPClient:
             resp.raise_for_status()
 
         logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        logger.debug(f"Respuesta evento:\n{resp.content.decode('utf-8', errors='replace')}")
         return self._parsear_respuesta_evento_xml(resp.content)
 
     def _parsear_respuesta_evento_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:

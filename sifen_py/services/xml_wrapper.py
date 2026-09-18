@@ -387,10 +387,30 @@ xmlgen.default.{metodo}(1, params, data).then(xml => {{
                 )
 
             xml = result.stdout.strip()
+
+            # El Node.js genera un SOAP envelope completo.
+            # Extraemos solo <gGroupGesEve> para firmarlo y luego
+            # construir el envelope definitivo igual que se hace con DEs.
+            xml = self._extraer_ggroupgeseve(xml)
+
             logger.info("Evento XML generado exitosamente")
             return xml
 
         except subprocess.TimeoutExpired:
             raise XMLGenerationException("Timeout al generar evento XML")
+        except XMLGenerationException:
+            raise
         except Exception as e:
             raise XMLGenerationException(f"Error al generar evento: {str(e)}")
+
+    @staticmethod
+    def _extraer_ggroupgeseve(xml_soap: str) -> str:
+        """
+        Extrae la cadena <gGroupGesEve>...</gGroupGesEve> del SOAP que genera
+        el Node.js. Si no la encuentra devuelve el XML original.
+        """
+        start = xml_soap.find('<gGroupGesEve')
+        end   = xml_soap.rfind('</gGroupGesEve>') + len('</gGroupGesEve>')
+        if start != -1 and end > start:
+            return xml_soap[start:end]
+        return xml_soap

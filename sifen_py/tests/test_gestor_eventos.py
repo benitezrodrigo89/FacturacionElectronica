@@ -37,25 +37,25 @@ def gestor(config_test):
 class TestCancelar:
     def test_llama_generar_xml_cancelacion(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'OK')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'OK')
         g.cancelar(cdc='A' * 44, motivo='Error de emisión')
         wrapper.generar_xml_evento_cancelacion.assert_called_once_with('A' * 44, 'Error de emisión')
 
     def test_firma_el_xml_generado(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'OK')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'OK')
         g.cancelar(cdc='A' * 44, motivo='Motivo')
         signer.firmar_xml.assert_called_once_with('<evento_cancelacion/>')
 
     def test_envia_el_xml_firmado(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'OK')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'OK')
         g.cancelar(cdc='A' * 44, motivo='Motivo')
-        client.enviar_evento_soap.assert_called_once_with('<evento_firmado/>')
+        client.enviar_evento_directo.assert_called_once_with('<evento_firmado/>')
 
     def test_retorna_respuesta_sifen(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'Evento recibido')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'Evento recibido')
         resp = g.cancelar(cdc='A' * 44, motivo='Motivo')
         assert isinstance(resp, RespuestaSIFEN)
         assert resp.codigo == '0300'
@@ -72,7 +72,7 @@ class TestCancelar:
 class TestInutilizar:
     def test_llama_generar_xml_inutilizacion(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'OK')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'OK')
         g.inutilizar(
             tipo_documento=1,
             establecimiento='001',
@@ -92,14 +92,14 @@ class TestInutilizar:
 
     def test_firma_y_envia(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'OK')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'OK')
         g.inutilizar(1, '001', '001', 1, 3, 'Error')
         signer.firmar_xml.assert_called_once()
-        client.enviar_evento_soap.assert_called_once()
+        client.enviar_evento_directo.assert_called_once()
 
     def test_retorna_respuesta_sifen(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'Recibido')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'Recibido')
         resp = g.inutilizar(1, '001', '001', 1, 1, 'Error')
         assert resp.codigo == '0300'
 
@@ -109,7 +109,7 @@ class TestInutilizar:
 class TestConformidad:
     def test_llama_generar_xml_conformidad(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'OK')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'OK')
         g.conformidad(
             cdc='A' * 44,
             tipo_conformidad=1,
@@ -123,21 +123,21 @@ class TestConformidad:
 
     def test_firma_y_envia(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'OK')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'OK')
         g.conformidad('A' * 44, 1, '2026-09-18T10:00:00')
         signer.firmar_xml.assert_called_once()
-        client.enviar_evento_soap.assert_called_once_with('<evento_firmado/>')
+        client.enviar_evento_directo.assert_called_once_with('<evento_firmado/>')
 
     def test_retorna_respuesta_sifen(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'Conformidad recibida')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'Conformidad recibida')
         resp = g.conformidad('A' * 44, 2, '2026-09-18T10:00:00')
         assert isinstance(resp, RespuestaSIFEN)
         assert resp.codigo == '0300'
 
     def test_conformidad_parcial(self, gestor):
         g, wrapper, signer, client = gestor
-        client.enviar_evento_soap.return_value = RespuestaSIFEN('0300', 'OK')
+        client.enviar_evento_directo.return_value = RespuestaSIFEN('0300', 'OK')
         g.conformidad('B' * 44, tipo_conformidad=2, fecha_recepcion='2026-09-18T08:00:00')
         wrapper.generar_xml_evento_conformidad.assert_called_once_with(
             cdc='B' * 44,
