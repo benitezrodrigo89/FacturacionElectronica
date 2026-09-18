@@ -44,7 +44,7 @@ class RespuestaSIFEN:
         self.codigo      = codigo
         self.descripcion = descripcion
         self.raw         = raw or {}
-        self.exitoso     = codigo in ('0300', '0360', '0362', '0420', '0422', 'OK')
+        self.exitoso     = codigo in ('0300', '0360', '0362', '0420', '0422', '0600', 'OK')
 
     def __repr__(self):
         return f"RespuestaSIFEN(codigo={self.codigo!r}, desc={self.descripcion!r}, exitoso={self.exitoso})"
