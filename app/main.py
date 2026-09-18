@@ -10,9 +10,22 @@ Dashboard web:     http://localhost:8000
 """
 import sys
 from pathlib import Path
+from loguru import logger
 
 # sifen_py debe ser importable desde FacturacionElectronica/
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Log a archivo — rota a 10 MB, guarda 7 días
+_LOG_FILE = Path(__file__).parent.parent / 'logs' / 'sifen.log'
+_LOG_FILE.parent.mkdir(exist_ok=True)
+logger.add(
+    str(_LOG_FILE),
+    rotation='10 MB',
+    retention='7 days',
+    level='DEBUG',
+    encoding='utf-8',
+    format='{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}',
+)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

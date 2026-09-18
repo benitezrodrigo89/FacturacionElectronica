@@ -630,6 +630,7 @@ class SifenSOAPClient:
         soap_bytes = soap_str.encode('utf-8') if isinstance(soap_str, str) else soap_str
 
         logger.info(f"Enviando evento SOAP a: {url} ({len(soap_bytes)} bytes)")
+        logger.debug(f"SOAP evento (primeros 2000 chars):\n{soap_bytes[:2000].decode('utf-8', errors='replace')}")
         try:
             resp = session.post(url, data=soap_bytes, headers=headers, timeout=self.timeout)
         except Exception as e:
@@ -639,6 +640,7 @@ class SifenSOAPClient:
             resp.raise_for_status()
 
         logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        logger.debug(f"Respuesta evento SIFEN:\n{resp.content.decode('utf-8', errors='replace')}")
         return self._parsear_respuesta_evento_xml(resp.content)
 
     def enviar_evento_directo(self, xml_evento_firmado: str) -> RespuestaSIFEN:
