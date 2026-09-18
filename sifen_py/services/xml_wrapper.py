@@ -406,11 +406,23 @@ xmlgen.default.{metodo}(1, params, data).then(xml => {{
     @staticmethod
     def _extraer_ggroupgeseve(xml_soap: str) -> str:
         """
-        Extrae la cadena <gGroupGesEve>...</gGroupGesEve> del SOAP que genera
-        el Node.js. Si no la encuentra devuelve el XML original.
+        Extrae <gGroupGesEve>...</gGroupGesEve> del SOAP generado por Node.js.
+
+        El namespace SIFEN está declarado en el elemento padre <rEnviEventoDe>,
+        no en <gGroupGesEve> directamente. Al extraerlo como substring hay que
+        añadirlo explícitamente para que lxml pueda encontrar los elementos por
+        namespace cuando el firmador los busca.
         """
         start = xml_soap.find('<gGroupGesEve')
         end   = xml_soap.rfind('</gGroupGesEve>') + len('</gGroupGesEve>')
-        if start != -1 and end > start:
-            return xml_soap[start:end]
-        return xml_soap
+        if start == -1 or end <= start:
+            return xml_soap
+        extracted = xml_soap[start:end]
+        sifen_ns = 'http://ekuatia.set.gov.py/sifen/xsd'
+        if f'xmlns="{sifen_ns}"' not in extracted:
+            extracted = extracted.replace(
+                '<gGroupGesEve',
+                f'<gGroupGesEve xmlns="{sifen_ns}"',
+                1,
+            )
+        return extracted
