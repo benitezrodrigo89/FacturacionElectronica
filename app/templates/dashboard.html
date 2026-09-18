@@ -58,6 +58,26 @@
   </div>
 </div>
 
+<!-- Modal consultar estado -->
+<div class="modal fade" id="modalConsulta" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-secondary text-white">
+        <h5 class="modal-title"><i class="bi bi-arrow-repeat me-1"></i>Estado en SIFEN</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="consulta-body">
+        <div class="text-center py-3">
+          <div class="spinner-border text-secondary"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal anulación -->
 <div class="modal fade" id="modalAnular" tabindex="-1">
   <div class="modal-dialog">
@@ -91,6 +111,37 @@
 </div>
 
 <script>
+async function consultarEstado(cdc, btn) {
+  const body = document.getElementById('consulta-body');
+  body.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-secondary"></div><p class="mt-2 text-muted small">Consultando SIFEN...</p></div>';
+  new bootstrap.Modal(document.getElementById('modalConsulta')).show();
+
+  try {
+    const resp = await fetch(`/api/v1/facturas/${cdc}/consultar`, {
+      method: 'POST',
+      headers: { 'X-API-Key': document.getElementById('api-key').value },
+    });
+    const data = await resp.json();
+
+    if (resp.ok) {
+      const estadoClass = data.estado_sifen === 'Aprobado' ? 'success' : 'warning';
+      body.innerHTML = `
+        <table class="table table-sm mb-0">
+          <tr><th>CDC</th><td><code class="small">${cdc.substring(0,20)}…</code></td></tr>
+          <tr><th>Estado SIFEN</th><td><span class="badge bg-${estadoClass}">${data.estado_sifen || '—'}</span></td></tr>
+          <tr><th>Código</th><td>${data.codigo_sifen}</td></tr>
+          <tr><th>Descripción</th><td>${data.descripcion}</td></tr>
+          ${data.protocolo_autorizacion ? `<tr><th>Protocolo</th><td><strong>${data.protocolo_autorizacion}</strong></td></tr>` : ''}
+        </table>`;
+      htmx.trigger('#content', 'load');
+    } else {
+      body.innerHTML = `<div class="alert alert-danger mb-0">${data.detail || 'Error al consultar'}</div>`;
+    }
+  } catch (e) {
+    body.innerHTML = `<div class="alert alert-danger mb-0">Error de conexión: ${e.message}</div>`;
+  }
+}
+
 function setActive(btn) {
   document.querySelectorAll('#filtros button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');

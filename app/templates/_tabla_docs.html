@@ -93,6 +93,11 @@
                 <i class="bi bi-file-earmark-pdf"></i>
               </a>
               {% endif %}
+              <button class="btn btn-outline-secondary btn-sm ms-1"
+                      title="Consultar estado en SIFEN"
+                      onclick="consultarEstado('{{ doc.cdc }}', this)">
+                <i class="bi bi-arrow-repeat"></i>
+              </button>
               {% if doc.estado == 'aprobado' %}
               <button class="btn btn-outline-danger btn-sm ms-1"
                       title="Anular documento"
