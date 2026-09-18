@@ -6,6 +6,7 @@ from typing import Optional
 
 from sifen_py.db.conexion import Conexion
 from sifen_py.db.repositorio import RepositorioDE
+from app.config_manager import get_api_keys
 
 router = APIRouter(tags=['Web'])
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / 'templates'))
@@ -17,7 +18,9 @@ def _rows(filas) -> list:
 
 @router.get('/', response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, 'dashboard.html')
+    keys    = get_api_keys()
+    api_key = keys[0] if keys else ''
+    return templates.TemplateResponse(request, 'dashboard.html', {'api_key': api_key})
 
 
 @router.get('/documentos-tabla', response_class=HTMLResponse)
