@@ -108,9 +108,10 @@ class SifenSOAPClient:
     }
 
     # Endpoints HTTP directos para eventos (cancelación, inutilización, etc.)
+    # Servicio síncrono en /de/ws/eventos/evento.wsdl (Manual Técnico v150 §7.10)
     URLS_EVENTO = {
-        'test': 'https://sifen-test.set.gov.py/de/ws/async/recibe-evento.wsdl',
-        'prod': 'https://sifen.set.gov.py/de/ws/async/recibe-evento.wsdl',
+        'test': 'https://sifen-test.set.gov.py/de/ws/eventos/evento.wsdl',
+        'prod': 'https://sifen.set.gov.py/de/ws/eventos/evento.wsdl',
     }
 
     def __init__(self, config: SifenConfig, timeout: int = 60):

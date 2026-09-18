@@ -18,7 +18,7 @@ URLS = {
         "consulta_lote": "https://sifen-test.set.gov.py/de/ws/consultas/consulta-lote.wsdl",
         "consulta_de":   "https://sifen-test.set.gov.py/de/ws/consultas/consulta.wsdl",
         "consulta_ruc":  "https://sifen-test.set.gov.py/de/ws/consultas/consulta-ruc.wsdl",
-        "recibe_evento": "https://sifen-test.set.gov.py/de/ws/async/recibe-evento.wsdl",
+        "recibe_evento": "https://sifen-test.set.gov.py/de/ws/eventos/evento.wsdl",
         "qr":            "https://ekuatia.set.gov.py/consultas-test/qr",
     },
     AMBIENTE_PRODUCCION: {
@@ -28,7 +28,7 @@ URLS = {
         "consulta_lote": "https://sifen.set.gov.py/de/ws/consultas/consulta-lote.wsdl",
         "consulta_de":   "https://sifen.set.gov.py/de/ws/consultas/consulta.wsdl",
         "consulta_ruc":  "https://sifen.set.gov.py/de/ws/consultas/consulta-ruc.wsdl",
-        "recibe_evento": "https://sifen.set.gov.py/de/ws/async/recibe-evento.wsdl",
+        "recibe_evento": "https://sifen.set.gov.py/de/ws/eventos/evento.wsdl",
         "qr":            "https://ekuatia.set.gov.py/consultas/qr",
     }
 }
