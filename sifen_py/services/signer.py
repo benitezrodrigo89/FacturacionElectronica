@@ -140,10 +140,14 @@ class XMLSigner:
             sifen_ns = "http://ekuatia.set.gov.py/sifen/xsd"
             ds_ns    = "http://www.w3.org/2000/09/xmldsig#"
 
-            # ── 1. Localizar <DE> y obtener el CDC ───────────────────────────
+            # ── 1. Localizar <DE> (documento) o <rEve> (evento) ─────────────
             de_elem = root.find('{%s}DE' % sifen_ns)
             if de_elem is None:
-                raise SignatureException("No se encontró el elemento <DE> en el XML")
+                # Puede ser un evento: <gGroupGesEve><rGesEve><rEve Id="1">
+                reve_elem = root.find('.//{%s}rEve' % sifen_ns)
+                if reve_elem is not None:
+                    return self._firmar_xml_evento(root, reve_elem)
+                raise SignatureException("No se encontró el elemento <DE> ni <rEve> en el XML")
             cdc = de_elem.get('Id', '')
 
             # ── 2. DigestValue sobre <DE> con C14N exclusivo ─────────────────
@@ -223,6 +227,78 @@ class XMLSigner:
         except Exception as e:
             logger.exception("Error al firmar XML")
             raise SignatureException(f"Error al firmar el XML: {str(e)}", code="SIGNATURE_ERROR")
+
+    def _firmar_xml_evento(self, root, reve_elem) -> str:
+        """
+        Firma un XML de evento SIFEN usando <rEve> como referencia.
+        La firma se inserta en <rGesEve> (padre de <rEve>), como hermano
+        posterior a <rEve>. No genera gCamFuFD (solo para DEs).
+        """
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        ds_ns   = "http://www.w3.org/2000/09/xmldsig#"
+        reve_id = reve_elem.get('Id', '1')
+
+        # 1. DigestValue sobre <rEve>
+        reve_c14n  = etree.tostring(reve_elem, method='c14n', exclusive=True)
+        digest_b64 = base64.b64encode(hashlib.sha256(reve_c14n).digest()).decode()
+
+        # 2. Construir estructura Signature
+        nsmap     = {None: ds_ns}
+        signature = etree.Element("{%s}Signature" % ds_ns, nsmap=nsmap)
+
+        signed_info = etree.SubElement(signature, "{%s}SignedInfo" % ds_ns)
+        etree.SubElement(signed_info, "{%s}CanonicalizationMethod" % ds_ns,
+                         Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
+        etree.SubElement(signed_info, "{%s}SignatureMethod" % ds_ns,
+                         Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256")
+
+        reference = etree.SubElement(signed_info, "{%s}Reference" % ds_ns, URI='#' + reve_id)
+        transforms = etree.SubElement(reference, "{%s}Transforms" % ds_ns)
+        etree.SubElement(transforms, "{%s}Transform" % ds_ns,
+                         Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature")
+        etree.SubElement(transforms, "{%s}Transform" % ds_ns,
+                         Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
+        etree.SubElement(reference, "{%s}DigestMethod" % ds_ns,
+                         Algorithm="http://www.w3.org/2001/04/xmlenc#sha256")
+        dv_elem      = etree.SubElement(reference, "{%s}DigestValue" % ds_ns)
+        dv_elem.text = digest_b64
+
+        sig_value_elem = etree.SubElement(signature, "{%s}SignatureValue" % ds_ns)
+
+        key_info  = etree.SubElement(signature, "{%s}KeyInfo" % ds_ns)
+        x509_data = etree.SubElement(key_info, "{%s}X509Data" % ds_ns)
+        x509_cert = etree.SubElement(x509_data, "{%s}X509Certificate" % ds_ns)
+        cert_pem  = self.certificate.public_bytes(serialization.Encoding.PEM)
+        cert_b64  = (cert_pem.decode()
+                     .replace('-----BEGIN CERTIFICATE-----', '')
+                     .replace('-----END CERTIFICATE-----', '')
+                     .replace('\n', ''))
+        x509_cert.text = cert_b64
+
+        # 3. Insertar Signature en <rGesEve> (padre de <rEve>)
+        rgeseve = reve_elem.getparent()
+        rgeseve.append(signature)
+
+        # 4. Canonicalizar SignedInfo en contexto del documento
+        si_in_doc        = root.find('.//{%s}SignedInfo' % ds_ns)
+        signed_info_c14n = etree.tostring(si_in_doc, method='c14n', exclusive=True)
+
+        # 5. Firmar y fijar SignatureValue
+        sig_bytes = self.private_key.sign(
+            signed_info_c14n,
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+        sig_value_elem.text = base64.b64encode(sig_bytes).decode()
+
+        xml_firmado = etree.tostring(
+            root, pretty_print=False, encoding='ASCII', xml_declaration=False
+        ).decode('ascii')
+
+        logger.success("Evento XML firmado exitosamente")
+        return xml_firmado
 
     def verificar_firma(self, xml_firmado: Union[str, bytes]) -> bool:
         """
