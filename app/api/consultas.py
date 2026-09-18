@@ -5,6 +5,7 @@ from typing import Optional
 from sifen_py.db.conexion import Conexion
 from sifen_py.db.repositorio import RepositorioDE
 from sifen_py.services.soap_client import SifenSOAPClient
+from loguru import logger
 
 from app.config_manager import get_sifen_config
 
@@ -84,8 +85,11 @@ async def consultar_sifen(cdc: str):
     try:
         client = SifenSOAPClient(get_sifen_config())
         try:
+            logger.info("Intentando consultar_de (zeep)...")
             resp_sifen = client.consultar_de(cdc)
-        except Exception:
+            logger.info(f"consultar_de (zeep) exitoso: {resp_sifen.codigo}")
+        except Exception as e_zeep:
+            logger.warning(f"consultar_de (zeep) falló: {e_zeep}. Usando directo.")
             resp_sifen = client.consultar_de_directo(cdc)
 
         if resp_sifen and resp_sifen.codigo in ('0422', '0420'):
