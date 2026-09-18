@@ -61,7 +61,13 @@ async def consultar_sifen(cdc: str):
         raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
     try:
         client = SifenSOAPClient(get_sifen_config())
-        resp = client.consultar_de_directo(cdc)
+        # consultar_de usa zeep (carga el WSDL automáticamente) → construye el
+        # SOAP correcto sin adivinar el nombre del elemento body.
+        # consultar_de_directo es el fallback para cuando el WSDL no es accesible.
+        try:
+            resp = client.consultar_de(cdc)
+        except Exception:
+            resp = client.consultar_de_directo(cdc)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error consultando SIFEN: {e}")
 
