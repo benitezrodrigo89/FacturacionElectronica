@@ -267,13 +267,15 @@ class SifenSOAPClient:
             'SOAPAction':   '',
         }
 
-        logger.info(f"Consultando DE por CDC directo: {cdc[:20]}…")
+        logger.info(f"Consultando DE directo: {url}")
+        logger.debug(f"Envelope consulta DE:\n{envelope.decode('ascii')}")
         try:
             resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
         except Exception as e:
             raise SOAPException(f"Error HTTP al consultar DE: {e}") from e
 
         logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        logger.debug(f"Respuesta consulta DE:\n{resp.content.decode('utf-8', errors='replace')}")
         return self._parsear_respuesta_consulta_de_xml(resp.content)
 
     def consultar_ruc_directo(self, ruc: str) -> RespuestaSIFEN:
