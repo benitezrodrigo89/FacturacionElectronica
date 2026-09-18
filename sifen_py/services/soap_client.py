@@ -609,6 +609,38 @@ class SifenSOAPClient:
         except Exception as e:
             raise SOAPException(f"Error en enviar_evento: {e}") from e
 
+    def enviar_evento_soap(self, soap_str: str) -> RespuestaSIFEN:
+        """
+        Envía el SOAP de evento completo (ya firmado) al endpoint de eventos.
+        Usa el envelope generado por Node.js con <rEnviEventoDe>/<dEvReg>
+        en lugar de construir uno nuevo.
+
+        Args:
+            soap_str: SOAP completo firmado (string o bytes)
+
+        Returns:
+            RespuestaSIFEN con el resultado
+        """
+        url     = self.URLS_EVENTO[self.config.ambiente]
+        session = self._get_session()
+        headers = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+        soap_bytes = soap_str.encode('utf-8') if isinstance(soap_str, str) else soap_str
+
+        logger.info(f"Enviando evento SOAP a: {url} ({len(soap_bytes)} bytes)")
+        try:
+            resp = session.post(url, data=soap_bytes, headers=headers, timeout=self.timeout)
+        except Exception as e:
+            raise SOAPException(f"Error HTTP al enviar evento: {e}") from e
+
+        if resp.status_code not in (200, 400, 500):
+            resp.raise_for_status()
+
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        return self._parsear_respuesta_evento_xml(resp.content)
+
     def enviar_evento_directo(self, xml_evento_firmado: str) -> RespuestaSIFEN:
         """
         Envía un evento firmado via HTTP POST directo (sin zeep/WSDL).

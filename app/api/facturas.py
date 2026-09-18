@@ -247,21 +247,23 @@ async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depen
         raise HTTPException(status_code=500, detail=f"Error procesando cancelación: {e}")
 
     # Actualizar BD
-    try:
-        db = Conexion()
-        db.conectar()
-        repo = RepositorioDE(db)
-        repo.marcar_cancelado(
-            cdc=cdc,
-            codigo=respuesta.codigo,
-            descripcion=respuesta.descripcion,
-            respuesta_xml=respuesta.raw.get('xml', ''),
-        )
-        db.cerrar()
-    except Exception:
-        pass
+    # Actualizar BD solo si SIFEN aceptó el evento (0300 = recibido en cola)
+    if respuesta.exitoso:
+        try:
+            db = Conexion()
+            db.conectar()
+            repo = RepositorioDE(db)
+            repo.marcar_cancelado(
+                cdc=cdc,
+                codigo=respuesta.codigo,
+                descripcion=respuesta.descripcion,
+                respuesta_xml=respuesta.raw.get('xml', ''),
+            )
+            db.cerrar()
+        except Exception:
+            pass
 
-    estado_resultado = 'cancelado' if respuesta.codigo == '0422' else 'pendiente_cancelacion'
+    estado_resultado = 'cancelado' if respuesta.exitoso else 'aprobado'
     return {
         "cdc": cdc,
         "codigo_sifen": respuesta.codigo,

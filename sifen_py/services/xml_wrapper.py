@@ -7,7 +7,6 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
 from loguru import logger
-from lxml import etree
 
 from sifen_py.core.exceptions import XMLGenerationException
 from sifen_py.core.config import SifenConfig
@@ -388,33 +387,10 @@ xmlgen.default.{metodo}(1, params, data).then(xml => {{
                 )
 
             xml = result.stdout.strip()
-
-            # El Node.js envuelve el evento en un SOAP envelope completo.
-            # Extraer solo <gGroupGesEve> — eso es lo que el firmador necesita.
-            xml = self._extraer_contenido_evento(xml)
-
             logger.info("Evento XML generado exitosamente")
             return xml
 
         except subprocess.TimeoutExpired:
             raise XMLGenerationException("Timeout al generar evento XML")
-        except XMLGenerationException:
-            raise
         except Exception as e:
             raise XMLGenerationException(f"Error al generar evento: {str(e)}")
-
-    def _extraer_contenido_evento(self, xml_soap: str) -> str:
-        """
-        El Node.js genera un sobre SOAP completo para eventos. Extrae
-        <gGroupGesEve> que es el contenido que el firmador necesita recibir.
-        Si la extracción falla devuelve el XML original.
-        """
-        try:
-            root   = etree.fromstring(xml_soap.encode('utf-8'))
-            ns     = 'http://ekuatia.set.gov.py/sifen/xsd'
-            gg_ele = root.find('.//{%s}gGroupGesEve' % ns)
-            if gg_ele is not None:
-                return etree.tostring(gg_ele, encoding='unicode')
-        except Exception as e:
-            logger.warning(f"No se pudo extraer gGroupGesEve del SOAP: {e}")
-        return xml_soap
