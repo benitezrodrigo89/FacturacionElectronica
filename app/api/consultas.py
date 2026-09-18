@@ -56,43 +56,69 @@ async def obtener_factura(cdc: str):
 
 @router.post('/facturas/{cdc}/consultar', summary="Consultar estado en SIFEN")
 async def consultar_sifen(cdc: str):
-    """Consulta el estado real en SIFEN y actualiza la BD."""
+    """
+    Devuelve el estado del documento desde la BD local.
+    Intenta enriquecer con datos frescos de SIFEN si el servicio de consulta
+    es accesible; si no, devuelve lo que hay en la BD.
+    """
     if len(cdc) != 44:
         raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
-    try:
-        client = SifenSOAPClient(get_sifen_config())
-        # consultar_de usa zeep (carga el WSDL automáticamente) → construye el
-        # SOAP correcto sin adivinar el nombre del elemento body.
-        # consultar_de_directo es el fallback para cuando el WSDL no es accesible.
-        try:
-            resp = client.consultar_de(cdc)
-        except Exception:
-            resp = client.consultar_de_directo(cdc)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error consultando SIFEN: {e}")
 
+    # 1. Leer siempre desde la BD primero
+    db = Conexion()
     try:
-        db = Conexion()
         db.conectar()
         repo = RepositorioDE(db)
-        if repo.obtener_por_cdc(cdc) and resp.codigo in ('0422', '0420'):
-            repo.actualizar_estado_consulta(
-                cdc=cdc,
-                codigo=resp.codigo,
-                descripcion=resp.descripcion,
-                protocolo=resp.raw.get('protocolo'),
-                respuesta_xml=resp.raw.get('xml'),
-            )
+        fila = repo.obtener_por_cdc(cdc)
         db.cerrar()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if not fila:
+        raise HTTPException(status_code=404, detail="Documento no encontrado en la BD")
+
+    fila = dict(fila) if hasattr(fila, 'keys') else fila
+
+    # 2. Intentar consulta en SIFEN como enriquecimiento (no falla si no funciona)
+    resp_sifen = None
+    try:
+        client = SifenSOAPClient(get_sifen_config())
+        try:
+            resp_sifen = client.consultar_de(cdc)
+        except Exception:
+            resp_sifen = client.consultar_de_directo(cdc)
+
+        if resp_sifen and resp_sifen.codigo in ('0422', '0420'):
+            db2 = Conexion()
+            db2.conectar()
+            repo2 = RepositorioDE(db2)
+            repo2.actualizar_estado_consulta(
+                cdc=cdc,
+                codigo=resp_sifen.codigo,
+                descripcion=resp_sifen.descripcion,
+                protocolo=resp_sifen.raw.get('protocolo'),
+                respuesta_xml=resp_sifen.raw.get('xml'),
+            )
+            db2.cerrar()
+            fila['estado'] = 'aprobado' if resp_sifen.codigo == '0422' else 'rechazado'
     except Exception:
-        pass
+        pass  # SIFEN no accesible — se retorna solo la info de BD
+
+    estado_sifen_map = {
+        'aprobado':   'Aprobado',
+        'rechazado':  'Rechazado',
+        'cancelado':  'Cancelado',
+        'pendiente':  'Pendiente',
+    }
 
     return {
-        "cdc": cdc,
-        "codigo_sifen": resp.codigo,
-        "descripcion": resp.descripcion,
-        "protocolo_autorizacion": resp.raw.get('protocolo'),
-        "estado_sifen": resp.raw.get('estado'),
+        "cdc":                   cdc,
+        "estado":                fila.get('estado', ''),
+        "estado_sifen":          estado_sifen_map.get(fila.get('estado', ''), fila.get('estado', '')),
+        "codigo_sifen":          resp_sifen.codigo if resp_sifen else fila.get('codigo_sifen', ''),
+        "descripcion":           resp_sifen.descripcion if resp_sifen else fila.get('descripcion_sifen', ''),
+        "protocolo_autorizacion": resp_sifen.raw.get('protocolo') if resp_sifen else fila.get('protocolo_autorizacion'),
+        "fuente":                "sifen" if resp_sifen and resp_sifen.codigo not in ('0160', 'ERR') else "bd_local",
     }
 
 
