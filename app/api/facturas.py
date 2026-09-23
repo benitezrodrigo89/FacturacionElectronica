@@ -108,8 +108,16 @@ def _build_data(req: FacturaRequest, numero_doc: int, cfg: dict) -> dict:
              summary="Emitir factura electrónica")
 async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_key)):
     """
-    Recibe datos de negocio, genera el XML, firma y envía a SIFEN.
-    Devuelve CDC, estado y URL del KuDE en PDF.
+    Emite una Factura Electrónica completa: genera XML, firma con certificado digital y envía a SIFEN.
+
+    **Flujo:** genera XML → firma XMLDSig → guarda en BD como pendiente → envía a SIFEN → actualiza estado.
+
+    **Número de documento (`numero_doc`):**
+    - Si se envía, el sistema lo usa directamente. Útil cuando el ERP/POS ya tiene su propia numeración.
+    - Si se omite, se asigna automáticamente el próximo número disponible en la BD.
+    - Devuelve `409` si el número ya existe en la base de datos.
+
+    **Respuesta:** CDC de 44 dígitos, estado (`aprobado` / `rechazado`), código SIFEN y URL del KuDE en PDF.
     """
     cfg = load_config()
     sifen_config = get_sifen_config()
