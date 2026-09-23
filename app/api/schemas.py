@@ -51,6 +51,11 @@ class FacturaRequest(BaseModel):
     items: List[ItemRequest] = Field(min_length=1)
     condicion_pago: CondicionPagoRequest = CondicionPagoRequest()
     descripcion: Optional[str] = Field(default=None, description="Descripción de la operación")
+    numero_doc: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Número de factura asignado por el sistema externo. Si se omite, se usa el próximo número disponible en la BD.",
+    )
 
 
 class CancelacionRequest(BaseModel):

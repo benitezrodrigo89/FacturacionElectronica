@@ -114,14 +114,27 @@ async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_ke
     cfg = load_config()
     sifen_config = get_sifen_config()
 
-    # 1. Número de documento desde BD
+    # 1. Número de documento — externo o auto-incremento
     db = Conexion()
     repo = None
     try:
         db.crear_base_si_no_existe()
         db.ejecutar_schema()
         repo = RepositorioDE(db)
-        numero_doc = repo.proximo_numero_doc()
+        if req.numero_doc is not None:
+            # Verificar que el número no esté ya registrado en la BD
+            existente = repo.obtener_por_numero_doc(req.numero_doc)
+            if existente:
+                db.cerrar()
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"El número de documento {req.numero_doc} ya existe en la base de datos.",
+                )
+            numero_doc = req.numero_doc
+        else:
+            numero_doc = repo.proximo_numero_doc()
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Error de base de datos: {e}")
 
