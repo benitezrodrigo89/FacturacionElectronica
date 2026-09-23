@@ -48,6 +48,13 @@ COLOR_TEXT      = colors.HexColor('#222222')
 COLOR_GRAY      = colors.HexColor('#666666')
 COLOR_RED       = colors.HexColor('#c0392b')
 
+# Ancho útil de página: A4 (210mm) - márgenes izquierdo y derecho (2 × 12mm)
+_PAGE_W = 186 * mm
+
+# Anchos de columna reutilizados
+_W_LABEL = 40 * mm          # etiqueta en tablas de 2 columnas
+_W_VALUE = _PAGE_W - _W_LABEL  # valor en tablas de 2 columnas (146mm)
+
 TIPO_DOC_LABELS = {
     1: 'FACTURA ELECTRÓNICA',
     4: 'AUTOFACTURA ELECTRÓNICA',
@@ -68,7 +75,7 @@ ESTADO_LABELS = {
 def _fmt_gs(monto) -> str:
     """Formatea un número como guaraníes con separador de miles."""
     try:
-        return f"₲ {int(float(monto)):,}".replace(',', '.')
+        return f"Gs. {int(float(monto)):,}".replace(',', '.')
     except (ValueError, TypeError):
         return str(monto)
 
@@ -201,9 +208,25 @@ class KuDEGenerator:
     def _seccion_cabecera(self, data: dict, tipo: int, logo_path: Optional[str]) -> list:
         cfg = self.config
         label_tipo = TIPO_DOC_LABELS.get(tipo, 'DOCUMENTO ELECTRÓNICO')
-        prefijo    = TIPO_DOC_PREFIJOS.get(tipo, 'DE')
+        result = []
 
-        # Columna izquierda: logo + datos emisor
+        # Banner de ambiente de prueba — ancho completo, fuera de la tabla del emisor
+        if cfg.es_test():
+            banner_tabla = Table(
+                [[Paragraph('AMBIENTE DE PRUEBA — NO VÁLIDO COMO COMPROBANTE', self._estilos['test_banner'])]],
+                colWidths=[_PAGE_W],
+            )
+            banner_tabla.setStyle(TableStyle([
+                ('BACKGROUND',    (0, 0), (-1, -1), COLOR_RED),
+                ('TOPPADDING',    (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING',  (0, 0), (-1, -1), 6),
+            ]))
+            result.append(banner_tabla)
+            result.append(Spacer(1, 1 * mm))
+
+        # Columna izquierda: logo (opcional) + datos del emisor
         emisor_lines = [
             Paragraph(cfg.razon_social.upper(), self._estilos['emisor_nombre']),
             Paragraph(f"RUC: {cfg.ruc}", self._estilos['emisor_dato']),
@@ -217,21 +240,6 @@ class KuDEGenerator:
         if cfg.email:
             emisor_lines.append(Paragraph(f"Email: {cfg.email}", self._estilos['emisor_dato']))
 
-        if cfg.es_test():
-            emisor_lines.insert(0, Paragraph("⚠ AMBIENTE DE PRUEBA — NO VÁLIDO COMO COMPROBANTE", self._estilos['test_banner']))
-
-        col_emisor = emisor_lines
-
-        # Logo
-        logo_content = []
-        if logo_path:
-            try:
-                img = RLImage(logo_path, width=40*mm, height=20*mm, kind='proportional')
-                logo_content.append(img)
-            except Exception:
-                pass
-        logo_content.append(Spacer(1, 1*mm))
-
         # Columna derecha: tipo de documento + número
         estab   = data.get('establecimiento', '001')
         punto   = data.get('punto', '001')
@@ -244,20 +252,43 @@ class KuDEGenerator:
             Paragraph(f"Timbrado: {data.get('timbrado', '—')}", self._estilos['timbrado']),
         ]
 
-        tabla = Table(
-            [[logo_content, col_emisor, col_doc]],
-            colWidths=[35*mm, 95*mm, 60*mm],
-        )
+        # Con logo: 3 columnas [logo | emisor | doc]; sin logo: 2 columnas [emisor | doc]
+        _W_DOC = 58 * mm
+        if logo_path:
+            logo_img = None
+            try:
+                logo_img = RLImage(logo_path, width=32 * mm, height=18 * mm, kind='proportional')
+            except Exception:
+                pass
+            if logo_img:
+                _W_LOGO  = 36 * mm
+                _W_EMIS  = _PAGE_W - _W_LOGO - _W_DOC
+                tabla = Table(
+                    [[logo_img, emisor_lines, col_doc]],
+                    colWidths=[_W_LOGO, _W_EMIS, _W_DOC],
+                )
+            else:
+                logo_path = None  # fallback a sin logo
+
+        if not logo_path:
+            _W_EMIS = _PAGE_W - _W_DOC
+            tabla = Table(
+                [[emisor_lines, col_doc]],
+                colWidths=[_W_EMIS, _W_DOC],
+            )
+
         tabla.setStyle(TableStyle([
-            ('VALIGN',      (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING',  (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('TOPPADDING',   (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING',(0, 0), (-1, -1), 2),
-            ('BOX',         (0, 0), (-1, -1), 0.5, COLOR_BORDER),
-            ('BACKGROUND',  (0, 0), (-1, -1), colors.white),
+            ('VALIGN',       (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING',  (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING',   (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING',(0, 0), (-1, -1), 4),
+            ('BOX',          (0, 0), (-1, -1), 0.5, COLOR_BORDER),
+            ('LINEBEFORE',   (-1, 0), (-1, -1), 0.5, COLOR_BORDER),
+            ('BACKGROUND',   (0, 0), (-1, -1), colors.white),
         ]))
-        return [tabla]
+        result.append(tabla)
+        return result
 
     def _seccion_documento(self, data: dict, cdc: str, estado: str,
                            numero_protocolo: Optional[str],
@@ -277,7 +308,7 @@ class KuDEGenerator:
         if data.get('tipoEmision') == 2:
             rows.append(['Tipo emisión:', Paragraph('<font color="red">CONTINGENCIA</font>', self._estilos['normal'])])
 
-        tabla = Table(rows, colWidths=[38*mm, None])
+        tabla = Table(rows, colWidths=[_W_LABEL, _W_VALUE])
         tabla.setStyle(self._estilo_tabla_datos())
         return [
             Paragraph('DATOS DEL DOCUMENTO', self._estilos['seccion_titulo']),
@@ -297,7 +328,7 @@ class KuDEGenerator:
         if c.get('email'):
             rows.append(['Email:', c.get('email')])
 
-        tabla = Table(rows, colWidths=[38*mm, None])
+        tabla = Table(rows, colWidths=[_W_LABEL, _W_VALUE])
         tabla.setStyle(self._estilo_tabla_datos())
         return [
             Paragraph(label, self._estilos['seccion_titulo']),
@@ -332,7 +363,8 @@ class KuDEGenerator:
             ]
             filas.append(fila)
 
-        col_widths = [20*mm, None, 18*mm, 28*mm, 22*mm, 16*mm, 28*mm]
+        # Anchos fijos = 20+15+28+20+14+28 = 125mm → descripción = 186-125 = 61mm
+        col_widths = [20*mm, 61*mm, 15*mm, 28*mm, 20*mm, 14*mm, 28*mm]
         tabla = Table(filas, colWidths=col_widths, repeatRows=1)
         tabla.setStyle(TableStyle([
             # Encabezado
@@ -392,7 +424,10 @@ class KuDEGenerator:
              Paragraph(f'<b>{_fmt_gs(subtotal_neto)}</b>', self._estilos['total'])],
         ])
 
-        tabla = Table(rows, colWidths=[None, 45*mm], hAlign='RIGHT')
+        # Tabla de totales alineada a la derecha, 145mm de ancho
+        _W_TOT_LABEL = 100 * mm
+        _W_TOT_VALUE = 45 * mm
+        tabla = Table(rows, colWidths=[_W_TOT_LABEL, _W_TOT_VALUE], hAlign='RIGHT')
         tabla.setStyle(TableStyle([
             ('FONTSIZE',     (0, 0), (-1, -1), 8),
             ('ALIGN',        (1, 0), (1, -1), 'RIGHT'),
@@ -421,7 +456,7 @@ class KuDEGenerator:
             for i, c in enumerate(cuotas, 1):
                 rows.append([f'  Cuota {i} ({c.get("vencimiento","")}):', _fmt_gs(c.get('monto', 0))])
 
-        tabla = Table(rows, colWidths=[50*mm, None])
+        tabla = Table(rows, colWidths=[_W_LABEL, _W_VALUE])
         tabla.setStyle(self._estilo_tabla_datos())
         return [
             Paragraph('CONDICIÓN DE PAGO', self._estilos['seccion_titulo']),
@@ -438,7 +473,7 @@ class KuDEGenerator:
             t = data['transportista']
             rows.append(['Transportista:', t.get('nombre', '—')])
             rows.append(['Matrícula:', t.get('matricula', '—')])
-        tabla = Table(rows, colWidths=[40*mm, None])
+        tabla = Table(rows, colWidths=[_W_LABEL, _W_VALUE])
         tabla.setStyle(self._estilo_tabla_datos())
         return [
             Paragraph('DATOS DE REMISIÓN', self._estilos['seccion_titulo']),
@@ -463,7 +498,7 @@ class KuDEGenerator:
             Paragraph(f'URL: {qr_url}', self._estilos['pie_url']),
         ]
 
-        tabla = Table([[qr_rl, nota_qr]], colWidths=[32*mm, None])
+        tabla = Table([[qr_rl, nota_qr]], colWidths=[32*mm, _PAGE_W - 32*mm])
         tabla.setStyle(TableStyle([
             ('VALIGN',  (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING',   (0, 0), (-1, -1), 3),
