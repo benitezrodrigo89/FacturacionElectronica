@@ -75,8 +75,8 @@ async def tabla_documentos(
             if estado else
             repo.listar_recientes(limite=limit, periodo=periodo)
         )
-        resumen = repo.resumen_estados()
-        resumen_tipo = repo.resumen_por_tipo()
+        resumen = repo.resumen_estados(periodo=periodo)
+        resumen_tipo = repo.resumen_por_tipo(periodo=periodo)
 
         # Para cada FE/NDE/etc., buscar si tiene NCE/NDE asociada
         for doc in docs:

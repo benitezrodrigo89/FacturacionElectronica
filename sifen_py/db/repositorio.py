@@ -372,27 +372,30 @@ class RepositorioDE:
             """)
             return cur.fetchone()
 
-    def resumen_estados(self) -> dict:
-        """Devuelve conteo de documentos por estado."""
+    def resumen_estados(self, periodo: str = 'todo') -> dict:
+        """Devuelve conteo de documentos por estado para el período indicado."""
+        filtro_fecha = self._FILTROS_PERIODO.get(periodo, '1=1')
         conn = self.db.conectar()
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT estado, COUNT(*) AS total
                 FROM documentos_electronicos
+                WHERE {filtro_fecha}
                 GROUP BY estado
                 ORDER BY estado
             """)
             rows = cur.fetchall()
         return {r['estado']: r['total'] for r in rows}
 
-    def resumen_por_tipo(self) -> dict:
-        """Devuelve conteo de documentos aprobados por tipo."""
+    def resumen_por_tipo(self, periodo: str = 'todo') -> dict:
+        """Devuelve conteo de documentos aprobados por tipo para el período indicado."""
+        filtro_fecha = self._FILTROS_PERIODO.get(periodo, '1=1')
         conn = self.db.conectar()
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT tipo_documento, COUNT(*) AS total
                 FROM documentos_electronicos
-                WHERE estado = 'aprobado'
+                WHERE estado = 'aprobado' AND {filtro_fecha}
                 GROUP BY tipo_documento
                 ORDER BY tipo_documento
             """)
