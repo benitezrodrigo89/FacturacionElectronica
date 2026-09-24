@@ -56,7 +56,7 @@ class RepositorioClientes:
                 VALUES (%s, %s, %s, %s, %s) RETURNING id
             """, (ruc.strip(), razon_social.strip(), direccion, telefono, email))
             conn.commit()
-            return cur.fetchone()[0]
+            return cur.fetchone()['id']
 
     def actualizar(self, cliente_id: int, ruc: str, razon_social: str,
                    direccion: str = '', telefono: str = '', email: str = '') -> bool:
@@ -121,7 +121,7 @@ class RepositorioProductos:
                 VALUES (%s, %s, %s, %s, %s) RETURNING id
             """, (codigo.strip() or None, descripcion.strip(), precio_unitario, unidad_medida, iva))
             conn.commit()
-            return cur.fetchone()[0]
+            return cur.fetchone()['id']
 
     def actualizar(self, producto_id: int, descripcion: str, precio_unitario: int,
                    iva: int, unidad_medida: int = 77, codigo: str = '') -> bool:
