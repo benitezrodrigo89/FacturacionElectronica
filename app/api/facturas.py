@@ -426,5 +426,5 @@ async def descargar_kude(cdc: str):
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="kude_{numero}.pdf"'},
+        headers={"Content-Disposition": f'inline; filename="kude_{numero}.pdf"'},
     )
