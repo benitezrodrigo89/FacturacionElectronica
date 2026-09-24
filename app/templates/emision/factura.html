@@ -13,6 +13,20 @@
     <i class="bi bi-person me-1"></i>Datos del Receptor
   </div>
   <div class="card-body">
+    <!-- Buscador de cliente -->
+    <div class="mb-3 position-relative">
+      <label class="form-label text-muted small">Buscar cliente guardado</label>
+      <input type="text" id="buscar-cliente" class="form-control form-control-sm"
+             placeholder="Escribí razón social o RUC…"
+             hx-get="/clientes/buscar"
+             hx-trigger="keyup changed delay:300ms"
+             hx-target="#resultados-cliente"
+             hx-include="[name='q_cliente']"
+             name="q_cliente"
+             autocomplete="off">
+      <div id="resultados-cliente" class="list-group shadow-sm position-absolute w-100"
+           style="z-index:1000; top:100%"></div>
+    </div>
     <div class="row g-3">
       <div class="col-md-4">
         <label class="form-label">RUC <span class="text-danger">*</span></label>
@@ -118,6 +132,24 @@
 
 <script src="/static/emision.js"></script>
 <script>
+  // Autocomplete de clientes
+  document.addEventListener('click', function(e) {
+    const item = e.target.closest('.cliente-resultado');
+    if (item) {
+      document.getElementById('ruc').value          = item.dataset.ruc;
+      document.getElementById('razon_social').value = item.dataset.razon;
+      document.getElementById('direccion').value    = item.dataset.direccion;
+      document.getElementById('telefono').value     = item.dataset.telefono;
+      document.getElementById('email').value        = item.dataset.email;
+      document.getElementById('buscar-cliente').value = '';
+      document.getElementById('resultados-cliente').innerHTML = '';
+    }
+    // Cerrar resultados al hacer click fuera
+    if (!e.target.closest('#buscar-cliente') && !e.target.closest('#resultados-cliente')) {
+      document.getElementById('resultados-cliente').innerHTML = '';
+    }
+  });
+
   // Agregar una fila inicial
   addItem(true);
 

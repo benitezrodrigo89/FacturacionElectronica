@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="d-flex align-items-center mb-3 gap-2">
+      <a href="/productos" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+      <h5 class="mb-0 fw-semibold">{{ titulo }}</h5>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <form method="post"
+              action="{% if producto %}/productos/{{ producto.id }}/editar{% else %}/productos{% endif %}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Código</label>
+            <input type="text" name="codigo" class="form-control"
+                   value="{{ producto.codigo if producto else '' }}"
+                   placeholder="Ej: PROD-001 (opcional)">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Descripción <span class="text-danger">*</span></label>
+            <input type="text" name="descripcion" class="form-control"
+                   value="{{ producto.descripcion if producto else '' }}" required>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-semibold">Precio unitario (Gs.) <span class="text-danger">*</span></label>
+              <input type="number" name="precio_unitario" class="form-control" min="0"
+                     value="{{ producto.precio_unitario if producto else 0 }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-semibold">IVA <span class="text-danger">*</span></label>
+              <select name="iva" class="form-select" required>
+                <option value="10" {% if not producto or producto.iva == 10 %}selected{% endif %}>10%</option>
+                <option value="5"  {% if producto and producto.iva == 5 %}selected{% endif %}>5%</option>
+                <option value="0"  {% if producto and producto.iva == 0 %}selected{% endif %}>Exento (0%)</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Unidad de medida <span class="text-danger">*</span></label>
+            <select name="unidad_medida" class="form-select" required>
+              {% for u in unidades %}
+              <option value="{{ u.codigo }}"
+                {% if producto and producto.unidad_medida == u.codigo %}selected
+                {% elif not producto and u.codigo == 77 %}selected{% endif %}>
+                {{ u.representacion }} — {{ u.descripcion }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="/productos" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1"></i>Guardar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

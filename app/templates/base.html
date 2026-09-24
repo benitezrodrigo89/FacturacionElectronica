@@ -57,6 +57,26 @@
         </ul>
       </div>
 
+      <!-- Dropdown Maestros -->
+      <div class="dropdown">
+        <a class="nav-link text-white dropdown-toggle {% if request.url.path.startswith('/clientes') or request.url.path.startswith('/productos') %}active{% endif %}"
+           href="#" role="button" data-bs-toggle="dropdown">
+          <i class="bi bi-database"></i> Maestros
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li>
+            <a class="dropdown-item" href="/clientes">
+              <i class="bi bi-people me-2"></i>Clientes
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="/productos">
+              <i class="bi bi-box-seam me-2"></i>Productos / Servicios
+            </a>
+          </li>
+        </ul>
+      </div>
+
       <a href="/configuracion" class="nav-link text-white {% if request.url.path == '/configuracion' %}active{% endif %}">
         <i class="bi bi-gear"></i> Configuración
       </a>

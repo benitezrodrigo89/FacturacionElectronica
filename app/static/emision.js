@@ -11,7 +11,15 @@ function addItem(showPrice = true) {
   tr.className = 'item-row';
   tr.innerHTML = `
     <td><input type="text" class="form-control form-control-sm item-codigo" placeholder="001"></td>
-    <td><input type="text" class="form-control form-control-sm item-desc" placeholder="Descripción" required></td>
+    <td class="position-relative">
+      <input type="text" class="form-control form-control-sm item-desc" placeholder="Descripción (o buscar…)"
+             autocomplete="off"
+             hx-get="/productos/buscar"
+             hx-trigger="keyup changed delay:300ms"
+             hx-target="next .producto-dropdown"
+             name="q_producto">
+      <div class="producto-dropdown list-group shadow-sm position-absolute w-100" style="z-index:1000;top:100%"></div>
+    </td>
     <td><input type="number" class="form-control form-control-sm item-qty" value="1" min="0.01" step="0.01" required></td>
     ${showPrice ? `
     <td><input type="number" class="form-control form-control-sm item-price" min="1" placeholder="0" required></td>
@@ -60,7 +68,7 @@ function getItems(withPrice = true) {
       descripcion:   row.querySelector('.item-desc').value.trim(),
       cantidad:      parseFloat(row.querySelector('.item-qty').value) || 0,
       codigo:        row.querySelector('.item-codigo')?.value.trim() || null,
-      unidad_medida: 77,
+      unidad_medida: parseInt(row.querySelector('.item-desc')?.dataset.unidad) || 77,
     };
     if (withPrice) {
       item.precio_unitario = parseInt(row.querySelector('.item-price').value) || 0;
@@ -121,3 +129,29 @@ async function enviarAPI(endpoint, payload) {
     btn.innerHTML = '<i class="bi bi-send me-1"></i>Emitir';
   }
 }
+
+// ── Autocomplete de productos en filas de ítems ────────────────────────────────
+document.addEventListener('click', function(e) {
+  const item = e.target.closest('.producto-resultado');
+  if (item) {
+    const row = item.closest('tr.item-row');
+    if (!row) return;
+    row.querySelector('.item-codigo').value = item.dataset.codigo || '';
+    const descEl = row.querySelector('.item-desc');
+    descEl.value = item.dataset.descripcion;
+    descEl.dataset.unidad = item.dataset.unidad || '77';
+    const priceEl = row.querySelector('.item-price');
+    if (priceEl) {
+      priceEl.value = item.dataset.precio;
+      const ivaEl = row.querySelector('.item-iva');
+      if (ivaEl) ivaEl.value = item.dataset.iva;
+      updateTotal();
+    }
+    row.querySelector('.producto-dropdown').innerHTML = '';
+    return;
+  }
+  // Cerrar dropdowns de producto al hacer click fuera
+  if (!e.target.closest('.item-desc') && !e.target.closest('.producto-dropdown')) {
+    document.querySelectorAll('.producto-dropdown').forEach(d => d.innerHTML = '');
+  }
+});

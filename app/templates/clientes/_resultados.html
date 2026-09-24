@@ -1,0 +1,14 @@
+{% for c in resultados %}
+<div class="list-group-item list-group-item-action py-2 cliente-resultado"
+     style="cursor:pointer"
+     data-ruc="{{ c.ruc }}"
+     data-razon="{{ c.razon_social }}"
+     data-direccion="{{ c.direccion or '' }}"
+     data-telefono="{{ c.telefono or '' }}"
+     data-email="{{ c.email or '' }}">
+  <div class="fw-semibold small">{{ c.razon_social }}</div>
+  <div class="text-muted" style="font-size:.78rem">{{ c.ruc }}{% if c.direccion %} · {{ c.direccion }}{% endif %}</div>
+</div>
+{% else %}
+<div class="list-group-item text-muted small py-2">No se encontraron resultados.</div>
+{% endfor %}

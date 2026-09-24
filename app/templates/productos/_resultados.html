@@ -1,0 +1,19 @@
+{% for p in resultados %}
+<div class="list-group-item list-group-item-action py-2 producto-resultado"
+     style="cursor:pointer"
+     data-id="{{ p.id }}"
+     data-codigo="{{ p.codigo or '' }}"
+     data-descripcion="{{ p.descripcion }}"
+     data-precio="{{ p.precio_unitario }}"
+     data-unidad="{{ p.unidad_medida }}"
+     data-iva="{{ p.iva }}">
+  <div class="fw-semibold small">{{ p.descripcion }}</div>
+  <div class="text-muted" style="font-size:.78rem">
+    {% if p.codigo %}{{ p.codigo }} · {% endif %}
+    Gs. {{ "{:,}".format(p.precio_unitario).replace(",", ".") }} ·
+    IVA {{ p.iva }}% · {{ p.unidad_medida_desc }}
+  </div>
+</div>
+{% else %}
+<div class="list-group-item text-muted small py-2">No se encontraron resultados.</div>
+{% endfor %}
