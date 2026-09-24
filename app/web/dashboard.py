@@ -57,7 +57,8 @@ async def facturas_aprobadas_por_ruc(request: Request, ruc: str = ''):
 async def tabla_documentos(
     request: Request,
     estado: Optional[str] = Query(None),
-    limit: int = Query(50),
+    periodo: str = Query('hoy'),
+    limit: int = Query(100),
 ):
     """Fragmento HTMX: resumen + tabla de documentos."""
     docs = []
@@ -69,7 +70,11 @@ async def tabla_documentos(
         db = Conexion()
         db.conectar()
         repo = RepositorioDE(db)
-        docs = _rows(repo.listar_por_estado(estado, limite=limit) if estado else repo.listar_recientes(limite=limit))
+        docs = _rows(
+            repo.listar_por_estado(estado, limite=limit, periodo=periodo)
+            if estado else
+            repo.listar_recientes(limite=limit, periodo=periodo)
+        )
         resumen = repo.resumen_estados()
         resumen_tipo = repo.resumen_por_tipo()
 
@@ -91,5 +96,6 @@ async def tabla_documentos(
         "resumen": resumen,
         "resumen_tipo": resumen_tipo,
         "estado_filtro": estado,
+        "periodo": periodo,
         "error": error,
     })

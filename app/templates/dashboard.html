@@ -10,47 +10,55 @@
   </a>
 </div>
 
-<!-- Filtros -->
-<div class="btn-group mb-3" role="group" id="filtros">
-  <button class="btn btn-outline-secondary btn-sm active" id="btn-todos"
-          hx-get="/documentos-tabla"
-          hx-target="#content"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner"
-          onclick="setActive(this)">
-    Todos
-  </button>
-  <button class="btn btn-outline-success btn-sm" id="btn-aprobado"
-          hx-get="/documentos-tabla?estado=aprobado"
-          hx-target="#content"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner"
-          onclick="setActive(this)">
-    <i class="bi bi-check-circle me-1"></i>Aprobados
-  </button>
-  <button class="btn btn-outline-danger btn-sm" id="btn-rechazado"
-          hx-get="/documentos-tabla?estado=rechazado"
-          hx-target="#content"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner"
-          onclick="setActive(this)">
-    <i class="bi bi-x-circle me-1"></i>Rechazados
-  </button>
-  <button class="btn btn-outline-warning btn-sm" id="btn-pendiente"
-          hx-get="/documentos-tabla?estado=pendiente"
-          hx-target="#content"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner"
-          onclick="setActive(this)">
-    <i class="bi bi-clock me-1"></i>Pendientes
-  </button>
-</div>
+<!-- Filtros: período + estado -->
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
 
-<span id="spinner" class="htmx-indicator spinner-border spinner-border-sm text-secondary ms-2"></span>
+  <!-- Período -->
+  <div class="btn-group" role="group" id="filtros-periodo">
+    <button class="btn btn-primary btn-sm active" data-periodo="hoy"
+            onclick="filtrar(this)">
+      <i class="bi bi-calendar-day me-1"></i>Hoy
+    </button>
+    <button class="btn btn-outline-primary btn-sm" data-periodo="semana"
+            onclick="filtrar(this)">
+      <i class="bi bi-calendar-week me-1"></i>Semana
+    </button>
+    <button class="btn btn-outline-primary btn-sm" data-periodo="mes"
+            onclick="filtrar(this)">
+      <i class="bi bi-calendar-month me-1"></i>Mes
+    </button>
+    <button class="btn btn-outline-primary btn-sm" data-periodo="todo"
+            onclick="filtrar(this)">
+      <i class="bi bi-calendar3 me-1"></i>Todo
+    </button>
+  </div>
+
+  <!-- Estado -->
+  <div class="btn-group" role="group" id="filtros-estado">
+    <button class="btn btn-outline-secondary btn-sm active" data-estado=""
+            onclick="filtrar(this)">
+      Todos
+    </button>
+    <button class="btn btn-outline-success btn-sm" data-estado="aprobado"
+            onclick="filtrar(this)">
+      <i class="bi bi-check-circle me-1"></i>Aprobados
+    </button>
+    <button class="btn btn-outline-danger btn-sm" data-estado="rechazado"
+            onclick="filtrar(this)">
+      <i class="bi bi-x-circle me-1"></i>Rechazados
+    </button>
+    <button class="btn btn-outline-warning btn-sm" data-estado="pendiente"
+            onclick="filtrar(this)">
+      <i class="bi bi-clock me-1"></i>Pendientes
+    </button>
+  </div>
+
+  <span id="spinner" class="htmx-indicator spinner-border spinner-border-sm text-secondary"></span>
+</div>
 
 <!-- Contenido cargado por HTMX -->
 <div id="content"
-     hx-get="/documentos-tabla"
+     hx-get="/documentos-tabla?periodo=hoy"
      hx-trigger="load"
      hx-swap="innerHTML">
   <div class="text-center py-5 text-muted">
@@ -133,7 +141,7 @@ async function consultarEstado(cdc, btn) {
           <tr><th>Descripción</th><td>${data.descripcion}</td></tr>
           ${data.protocolo_autorizacion ? `<tr><th>Protocolo</th><td><strong>${data.protocolo_autorizacion}</strong></td></tr>` : ''}
         </table>`;
-      htmx.ajax('GET', '/documentos-tabla', {target: '#content', swap: 'innerHTML'});
+      recargarTabla();
     } else {
       body.innerHTML = `<div class="alert alert-danger mb-0">${data.detail || 'Error al consultar'}</div>`;
     }
@@ -142,9 +150,42 @@ async function consultarEstado(cdc, btn) {
   }
 }
 
-function setActive(btn) {
-  document.querySelectorAll('#filtros button').forEach(b => b.classList.remove('active'));
+function getPeriodo() {
+  const btn = document.querySelector('#filtros-periodo .active');
+  return btn ? btn.dataset.periodo : 'hoy';
+}
+
+function getEstado() {
+  const btn = document.querySelector('#filtros-estado .active');
+  return btn ? btn.dataset.estado : '';
+}
+
+function recargarTabla() {
+  const p = getPeriodo();
+  const e = getEstado();
+  const qs = `periodo=${p}${e ? '&estado=' + e : ''}`;
+  htmx.ajax('GET', `/documentos-tabla?${qs}`, {target: '#content', swap: 'innerHTML'});
+}
+
+function filtrar(btn) {
+  const grupo = btn.closest('.btn-group');
+  grupo.querySelectorAll('button').forEach(b => {
+    b.classList.remove('active');
+    b.classList.add(b.classList.contains('btn-primary') ? 'btn-outline-primary' :
+                    b.classList.contains('btn-success') ? 'btn-outline-success' :
+                    b.classList.contains('btn-danger')  ? 'btn-outline-danger'  :
+                    b.classList.contains('btn-warning') ? 'btn-outline-warning' : 'btn-outline-secondary');
+    b.classList.remove('btn-primary','btn-success','btn-danger','btn-warning','btn-secondary');
+  });
   btn.classList.add('active');
+  // Quitar outline del botón activo
+  ['btn-outline-primary','btn-outline-success','btn-outline-danger',
+   'btn-outline-warning','btn-outline-secondary'].forEach(c => btn.classList.remove(c));
+  recargarTabla();
+}
+
+function setActive(btn) {
+  filtrar(btn);
 }
 
 function prepararAnulacion(btn) {
@@ -184,7 +225,7 @@ async function confirmarAnulacion() {
       // Cerrar modal y recargar tabla
       setTimeout(() => {
         bootstrap.Modal.getInstance(document.getElementById('modalAnular')).hide();
-        htmx.ajax('GET', '/documentos-tabla', {target: '#content', swap: 'innerHTML'});
+        recargarTabla();
       }, 1500);
     } else {
       res.innerHTML = `<div class="alert alert-danger mb-0">${data.detail || 'Error al anular'}</div>`;

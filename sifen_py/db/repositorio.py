@@ -288,36 +288,48 @@ class RepositorioDE:
             )
             return cur.fetchone()
 
-    def listar_por_estado(self, estado: str, limite: int = 100) -> list:
+    _FILTROS_PERIODO = {
+        'hoy':    "DATE(created_at AT TIME ZONE 'America/Asuncion') = CURRENT_DATE",
+        'semana': "created_at >= NOW() - INTERVAL '7 days'",
+        'mes':    "DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())",
+        'todo':   "1=1",
+    }
+
+    def listar_por_estado(self, estado: str, limite: int = 100,
+                          periodo: str = 'todo') -> list:
         """
-        Devuelve los DEs según su estado.
-        Estados: 'pendiente' | 'aprobado' | 'rechazado' | 'duplicado' | 'error'
+        Devuelve los DEs según su estado y período.
+        Estados: 'pendiente' | 'aprobado' | 'rechazado' | 'cancelado' | 'error'
+        Períodos: 'hoy' | 'semana' | 'mes' | 'todo'
         """
+        filtro_fecha = self._FILTROS_PERIODO.get(periodo, '1=1')
         conn = self.db.conectar()
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT id, cdc, numero_doc, tipo_documento, estado, codigo_sifen,
                        protocolo_autorizacion, ruc_receptor, razon_social_receptor,
                        monto_total, fecha_emision, fecha_envio, intentos,
                        data_json IS NOT NULL AS data_json
                 FROM documentos_electronicos
-                WHERE estado = %s
+                WHERE estado = %s AND {filtro_fecha}
                 ORDER BY fecha_envio DESC
                 LIMIT %s
             """, (estado, limite))
             return cur.fetchall()
 
-    def listar_recientes(self, limite: int = 20) -> list:
-        """Devuelve los últimos N documentos enviados."""
+    def listar_recientes(self, limite: int = 100, periodo: str = 'hoy') -> list:
+        """Devuelve los documentos según el período indicado (por defecto: hoy)."""
+        filtro_fecha = self._FILTROS_PERIODO.get(periodo, '1=1')
         conn = self.db.conectar()
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT id, cdc, numero_doc, tipo_documento, estado, codigo_sifen,
                        descripcion_sifen, protocolo_autorizacion,
                        ruc_receptor, razon_social_receptor, monto_total,
                        fecha_emision, fecha_envio, intentos,
                        data_json IS NOT NULL AS data_json
                 FROM documentos_electronicos
+                WHERE {filtro_fecha}
                 ORDER BY created_at DESC
                 LIMIT %s
             """, (limite,))
