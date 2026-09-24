@@ -73,20 +73,20 @@
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th class="ps-3">#Doc</th>
+            <th class="ps-3 d-none d-md-table-cell">#Doc</th>
             <th>Tipo</th>
-            <th>Fecha</th>
+            <th class="d-none d-sm-table-cell">Fecha</th>
             <th>Receptor</th>
-            <th class="text-end">Monto</th>
+            <th class="text-end d-none d-sm-table-cell">Monto</th>
             <th>Estado</th>
-            <th>CDC</th>
+            <th class="d-none d-lg-table-cell">CDC</th>
             <th class="text-center">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {% for doc in docs %}
           <tr>
-            <td class="ps-3 text-muted fw-semibold">{{ doc.numero_doc }}</td>
+            <td class="ps-3 text-muted fw-semibold d-none d-md-table-cell">{{ doc.numero_doc }}</td>
             <td>
               {% set tipo = doc.tipo_documento | int %}
               {% if tipo == 1 %}<span class="badge bg-primary rounded-pill">FE</span>
@@ -96,14 +96,18 @@
               {% elif tipo == 7 %}<span class="badge bg-secondary rounded-pill">NRE</span>
               {% else %}<span class="badge bg-secondary rounded-pill">DE</span>{% endif %}
             </td>
-            <td class="text-nowrap small">
+            <td class="text-nowrap small d-none d-sm-table-cell">
               {{ doc.fecha_envio.strftime('%d/%m/%Y %H:%M') if doc.fecha_envio else '—' }}
             </td>
             <td>
               <div class="small fw-semibold">{{ doc.razon_social_receptor or '—' }}</div>
-              <div class="small text-muted">{{ doc.ruc_receptor or '' }}</div>
+              <div class="small text-muted d-none d-sm-block">{{ doc.ruc_receptor or '' }}</div>
+              <div class="small text-muted d-sm-none">
+                {{ doc.fecha_envio.strftime('%d/%m/%y') if doc.fecha_envio else '' }}
+                {% if doc.monto_total %} · Gs. {{ "{:,}".format(doc.monto_total | int).replace(',', '.') }}{% endif %}
+              </div>
             </td>
-            <td class="text-end text-nowrap">
+            <td class="text-end text-nowrap d-none d-sm-table-cell">
               {% if doc.monto_total %}
                 <span class="fw-semibold">Gs. {{ "{:,}".format(doc.monto_total | int).replace(',', '.') }}</span>
               {% else %}—{% endif %}
@@ -132,7 +136,7 @@
                 {% endfor %}
               {% endif %}
             </td>
-            <td><code class="cdc">{{ doc.cdc[:16] }}…</code></td>
+            <td class="d-none d-lg-table-cell"><code class="cdc">{{ doc.cdc[:16] }}…</code></td>
             <td class="text-center text-nowrap">
               {% if doc.data_json %}
               <a href="/api/v1/facturas/{{ doc.cdc }}/kude"

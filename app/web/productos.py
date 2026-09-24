@@ -111,6 +111,41 @@ async def toggle_producto(request: Request, producto_id: int):
     return RedirectResponse('/productos', status_code=303)
 
 
+# ── Auto-guardar batch desde formulario de emisión ──
+@router.post('/productos/autoguardar-batch')
+async def autoguardar_productos(request: Request):
+    """
+    Guarda los productos del batch si no existen.
+    Body JSON: [{descripcion, precio_unitario, iva, unidad_medida, codigo}, ...]
+    """
+    import json as _json
+    try:
+        items = await request.json()
+    except Exception:
+        return {'guardados': 0}
+    db, repo = _db_repo()
+    guardados = 0
+    try:
+        for item in items:
+            desc = (item.get('descripcion') or '').strip()
+            if not desc:
+                continue
+            try:
+                repo.autoguardar(
+                    descripcion=desc,
+                    precio_unitario=int(item.get('precio_unitario', 0)),
+                    iva=int(item.get('iva', 10)),
+                    unidad_medida=int(item.get('unidad_medida', 77)),
+                    codigo=(item.get('codigo') or '').strip(),
+                )
+                guardados += 1
+            except Exception:
+                pass
+    finally:
+        db.cerrar()
+    return {'guardados': guardados}
+
+
 # ── Endpoint HTMX para autocomplete en formularios de emisión ──
 @router.get('/productos/buscar', response_class=HTMLResponse)
 async def buscar_productos_htmx(request: Request, q: str = ''):

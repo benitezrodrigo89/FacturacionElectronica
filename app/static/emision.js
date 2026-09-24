@@ -105,6 +105,36 @@ function mostrarResultado(data, ok) {
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ── Auto-guardar cliente y productos en maestros ──────────────────────────────
+async function autoGuardarMaestros(payload) {
+  try {
+    // Guardar cliente
+    if (payload.receptor?.ruc && payload.receptor?.razon_social) {
+      const fd = new FormData();
+      fd.append('ruc',          payload.receptor.ruc);
+      fd.append('razon_social', payload.receptor.razon_social);
+      fd.append('direccion',    payload.receptor.direccion  || '');
+      fd.append('telefono',     payload.receptor.telefono   || '');
+      fd.append('email',        payload.receptor.email      || '');
+      fetch('/clientes/autoguardar', { method: 'POST', body: fd }).catch(() => {});
+    }
+    // Guardar productos en batch
+    if (payload.items?.length) {
+      fetch('/productos/autoguardar-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload.items.map(i => ({
+          descripcion:     i.descripcion,
+          precio_unitario: i.precio_unitario,
+          iva:             i.iva,
+          unidad_medida:   i.unidad_medida || 77,
+          codigo:          i.codigo || '',
+        }))),
+      }).catch(() => {});
+    }
+  } catch (e) { /* silencioso — no bloquea el flujo */ }
+}
+
 // ── Envío al API ───────────────────────────────────────────────────────────────
 async function enviarAPI(endpoint, payload) {
   const btn = document.getElementById('btn-emitir');
@@ -121,6 +151,7 @@ async function enviarAPI(endpoint, payload) {
     });
     const data = await resp.json();
     mostrarResultado(data, resp.ok);
+    if (resp.ok) autoGuardarMaestros(payload);
   } catch (e) {
     document.getElementById('resultado').innerHTML =
       `<div class="alert alert-danger mt-3">Error de conexión: ${e.message}</div>`;

@@ -99,6 +99,29 @@ async def toggle_cliente(request: Request, cliente_id: int):
     return RedirectResponse('/clientes', status_code=303)
 
 
+# ── Auto-guardar desde formulario de emisión ──
+@router.post('/clientes/autoguardar')
+async def autoguardar_cliente(
+    ruc: str = Form(...),
+    razon_social: str = Form(...),
+    direccion: str = Form(''),
+    telefono: str = Form(''),
+    email: str = Form(''),
+):
+    """Guarda el cliente si no existe. Llamado automáticamente al emitir una FE/NCE."""
+    if not ruc or not razon_social:
+        return {'guardado': False}
+    db, repo = _db_repo()
+    try:
+        cliente_id = repo.autoguardar(ruc=ruc, razon_social=razon_social,
+                                      direccion=direccion, telefono=telefono, email=email)
+        return {'guardado': True, 'id': cliente_id}
+    except Exception:
+        return {'guardado': False}
+    finally:
+        db.cerrar()
+
+
 # ── Endpoint HTMX para autocomplete en formularios de emisión ──
 @router.get('/clientes/buscar', response_class=HTMLResponse)
 async def buscar_clientes_htmx(request: Request, q: str = ''):

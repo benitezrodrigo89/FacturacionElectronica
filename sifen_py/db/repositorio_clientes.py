@@ -43,9 +43,18 @@ class RepositorioClientes:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, ruc, razon_social, direccion, telefono, email, activo "
-                "FROM clientes_sifen WHERE ruc = %s AND activo = TRUE LIMIT 1", (ruc,)
+                "FROM clientes_sifen WHERE UPPER(ruc) = UPPER(%s) LIMIT 1", (ruc.strip(),)
             )
             return cur.fetchone()
+
+    def autoguardar(self, ruc: str, razon_social: str, direccion: str = '',
+                    telefono: str = '', email: str = '') -> int:
+        """Crea el cliente si no existe. Devuelve el id (nuevo o existente)."""
+        existente = self.obtener_por_ruc(ruc)
+        if existente:
+            return dict(existente)['id']
+        return self.crear(ruc=ruc, razon_social=razon_social,
+                          direccion=direccion, telefono=telefono, email=email)
 
     def crear(self, ruc: str, razon_social: str, direccion: str = '',
               telefono: str = '', email: str = '') -> int:
@@ -82,6 +91,27 @@ class RepositorioProductos:
 
     def __init__(self, db: Conexion):
         self.db = db
+
+    def autoguardar(self, descripcion: str, precio_unitario: int, iva: int,
+                    unidad_medida: int = 77, codigo: str = '') -> int:
+        """Crea el producto si no existe (busca por código o descripción exacta UPPER). Devuelve el id."""
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            if codigo:
+                cur.execute(
+                    "SELECT id FROM productos_sifen WHERE UPPER(codigo) = UPPER(%s) AND activo=TRUE LIMIT 1",
+                    (codigo.strip(),)
+                )
+            else:
+                cur.execute(
+                    "SELECT id FROM productos_sifen WHERE UPPER(descripcion) = UPPER(%s) AND activo=TRUE LIMIT 1",
+                    (descripcion.strip(),)
+                )
+            row = cur.fetchone()
+        if row:
+            return dict(row)['id']
+        return self.crear(descripcion=descripcion, precio_unitario=precio_unitario,
+                          iva=iva, unidad_medida=unidad_medida, codigo=codigo)
 
     def listar(self, busqueda: str = '', solo_activos: bool = True) -> list:
         conn = self.db.conectar()
