@@ -104,14 +104,18 @@ async def obtener_items_factura(cdc: str):
 @router.post('/facturas/{cdc}/consultar', summary="Consultar estado en SIFEN")
 async def consultar_sifen(cdc: str):
     """
-    Devuelve el estado del documento desde la BD local.
-    Intenta enriquecer con datos frescos de SIFEN si el servicio de consulta
-    es accesible; si no, devuelve lo que hay en la BD.
+    Consulta el estado del documento directamente en SIFEN.
+    Si SIFEN no es accesible (error de red/conexión), devuelve los datos de la BD local.
+
+    **Códigos de respuesta SIFEN:**
+    - `0422` — DE aprobado (incluye número de protocolo)
+    - `0420` — DE no existe o fue rechazado
+    - `0160` — DE no encontrado (puede ocurrir si la IP no está habilitada en DataPower)
     """
     if len(cdc) != 44:
         raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
 
-    # 1. Leer siempre desde la BD primero
+    # 1. Leer BD local
     db = Conexion()
     try:
         db.conectar()
@@ -126,19 +130,22 @@ async def consultar_sifen(cdc: str):
 
     fila = dict(fila) if hasattr(fila, 'keys') else fila
 
-    # 2. Intentar consulta en SIFEN como enriquecimiento (no falla si no funciona)
+    # 2. Consultar SIFEN — si responde (cualquier código), usamos esa respuesta
     resp_sifen = None
+    error_conexion = None
     try:
         client = SifenSOAPClient(get_sifen_config())
         try:
-            logger.info("Intentando consultar_de (zeep)...")
             resp_sifen = client.consultar_de(cdc)
-            logger.info(f"consultar_de (zeep) exitoso: {resp_sifen.codigo}")
-        except Exception as e_zeep:
-            logger.warning(f"consultar_de (zeep) falló: {e_zeep}. Usando directo.")
+        except Exception:
             resp_sifen = client.consultar_de_directo(cdc)
+    except Exception as e:
+        error_conexion = str(e)
+        logger.warning(f"No se pudo conectar a SIFEN para consultar {cdc}: {e}")
 
-        if resp_sifen and resp_sifen.codigo in ('0422', '0420'):
+    # 3. Si SIFEN respondió con 0422/0420, actualizar BD
+    if resp_sifen and resp_sifen.codigo in ('0422', '0420'):
+        try:
             db2 = Conexion()
             db2.conectar()
             repo2 = RepositorioDE(db2)
@@ -151,24 +158,35 @@ async def consultar_sifen(cdc: str):
             )
             db2.cerrar()
             fila['estado'] = 'aprobado' if resp_sifen.codigo == '0422' else 'rechazado'
-    except Exception:
-        pass  # SIFEN no accesible — se retorna solo la info de BD
+        except Exception:
+            pass
 
-    estado_sifen_map = {
-        'aprobado':   'Aprobado',
-        'rechazado':  'Rechazado',
-        'cancelado':  'Cancelado',
-        'pendiente':  'Pendiente',
+    # 4. Construir respuesta — priorizar datos de SIFEN sobre BD local
+    if resp_sifen:
+        codigo    = resp_sifen.codigo
+        descripcion = resp_sifen.descripcion
+        protocolo   = resp_sifen.raw.get('protocolo') or fila.get('protocolo_autorizacion')
+        fuente      = 'sifen'
+    else:
+        codigo      = fila.get('codigo_sifen', '')
+        descripcion = fila.get('descripcion_sifen', '')
+        protocolo   = fila.get('protocolo_autorizacion')
+        fuente      = 'bd_local'
+
+    estado_labels = {
+        'aprobado': 'Aprobado', 'rechazado': 'Rechazado',
+        'cancelado': 'Cancelado', 'pendiente': 'Pendiente',
     }
 
     return {
-        "cdc":                   cdc,
-        "estado":                fila.get('estado', ''),
-        "estado_sifen":          estado_sifen_map.get(fila.get('estado', ''), fila.get('estado', '')),
-        "codigo_sifen":          resp_sifen.codigo if resp_sifen else fila.get('codigo_sifen', ''),
-        "descripcion":           resp_sifen.descripcion if resp_sifen else fila.get('descripcion_sifen', ''),
-        "protocolo_autorizacion": resp_sifen.raw.get('protocolo') if resp_sifen else fila.get('protocolo_autorizacion'),
-        "fuente":                "sifen" if resp_sifen and resp_sifen.codigo not in ('0160', 'ERR') else "bd_local",
+        "cdc":                    cdc,
+        "estado":                 fila.get('estado', ''),
+        "estado_sifen":           estado_labels.get(fila.get('estado', ''), fila.get('estado', '')),
+        "codigo_sifen":           codigo,
+        "descripcion":            descripcion,
+        "protocolo_autorizacion": protocolo,
+        "fuente":                 fuente,
+        "error_conexion":         error_conexion,
     }
 
 
