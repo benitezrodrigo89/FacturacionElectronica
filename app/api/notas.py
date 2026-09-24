@@ -117,6 +117,7 @@ def _build_data_nce(req: NotaCreditoRequest, numero_doc: int, cfg: dict) -> dict
         ref = req.documento_referencia
         data["documentoAsociado"] = [{
             "tipoDocumento": 1,
+            "formato":       ref.formato,
             "cdc":           ref.cdc,
             "timbrado":      ref.timbrado or cfg['timbrado_numero'],
             "establecimiento": ref.establecimiento or cfg['establecimiento'],

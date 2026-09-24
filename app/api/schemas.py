@@ -98,6 +98,10 @@ class DocumentoReferencia(BaseModel):
     punto:           Optional[str] = None
     numero:          Optional[int] = None
     fecha:           Optional[str] = Field(default=None, description="Formato YYYY-MM-DD")
+    formato:         int = Field(
+        default=1,
+        description="Formato del documento referenciado: 1=Electrónico, 2=Impreso, 3=Constancia Electrónica",
+    )
 
 
 class NotaCreditoRequest(BaseModel):
