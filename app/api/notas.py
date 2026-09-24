@@ -140,7 +140,7 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
     cfg          = load_config()
     sifen_config = get_sifen_config()
 
-    # 1. Número de documento desde BD
+    # 1. Número de documento + validación del documento referenciado
     db   = Conexion()
     repo = None
     try:
@@ -150,6 +150,29 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
         numero_doc = repo.proximo_numero_doc()
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Error de base de datos: {e}")
+
+    # Verificar que la factura referenciada exista y esté aprobada
+    if req.documento_referencia and req.documento_referencia.cdc:
+        ref_cdc = req.documento_referencia.cdc
+        try:
+            doc_ref = repo.obtener_por_cdc(ref_cdc)
+        except Exception as e:
+            db.cerrar()
+            raise HTTPException(status_code=503, detail=f"Error consultando documento referenciado: {e}")
+
+        if doc_ref:
+            doc_ref = dict(doc_ref) if hasattr(doc_ref, 'keys') else doc_ref
+            estado_ref = doc_ref.get('estado', '')
+            if estado_ref != 'aprobado':
+                db.cerrar()
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"El documento referenciado (CDC: {ref_cdc}) "
+                        f"no está en estado aprobado — estado actual: '{estado_ref}'. "
+                        f"No se puede emitir una NCE sobre un documento {estado_ref}."
+                    ),
+                )
 
     # 2. Generar XML
     data = _build_data_nce(req, numero_doc, cfg)
