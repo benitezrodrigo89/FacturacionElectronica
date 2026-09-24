@@ -16,14 +16,14 @@ class RepositorioClientes:
             if busqueda:
                 cur.execute(f"""
                     SELECT id, ruc, razon_social, direccion, telefono, email, activo
-                    FROM clientes
+                    FROM clientes_sifen
                     WHERE (razon_social ILIKE %s OR ruc ILIKE %s) {filtro_activo}
                     ORDER BY razon_social LIMIT 50
                 """, (f'%{busqueda}%', f'%{busqueda}%'))
             else:
                 cur.execute(f"""
                     SELECT id, ruc, razon_social, direccion, telefono, email, activo
-                    FROM clientes
+                    FROM clientes_sifen
                     WHERE 1=1 {filtro_activo}
                     ORDER BY razon_social LIMIT 200
                 """)
@@ -34,7 +34,7 @@ class RepositorioClientes:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, ruc, razon_social, direccion, telefono, email, activo "
-                "FROM clientes WHERE id = %s", (cliente_id,)
+                "FROM clientes_sifen WHERE id = %s", (cliente_id,)
             )
             return cur.fetchone()
 
@@ -43,7 +43,7 @@ class RepositorioClientes:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, ruc, razon_social, direccion, telefono, email, activo "
-                "FROM clientes WHERE ruc = %s AND activo = TRUE LIMIT 1", (ruc,)
+                "FROM clientes_sifen WHERE ruc = %s AND activo = TRUE LIMIT 1", (ruc,)
             )
             return cur.fetchone()
 
@@ -52,7 +52,7 @@ class RepositorioClientes:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO clientes (ruc, razon_social, direccion, telefono, email)
+                INSERT INTO clientes_sifen (ruc, razon_social, direccion, telefono, email)
                 VALUES (%s, %s, %s, %s, %s) RETURNING id
             """, (ruc.strip(), razon_social.strip(), direccion, telefono, email))
             conn.commit()
@@ -63,7 +63,7 @@ class RepositorioClientes:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
-                UPDATE clientes SET ruc=%s, razon_social=%s, direccion=%s,
+                UPDATE clientes_sifen SET ruc=%s, razon_social=%s, direccion=%s,
                                     telefono=%s, email=%s
                 WHERE id=%s
             """, (ruc.strip(), razon_social.strip(), direccion, telefono, email, cliente_id))
@@ -73,7 +73,7 @@ class RepositorioClientes:
     def cambiar_estado(self, cliente_id: int, activo: bool) -> bool:
         conn = self.db.conectar()
         with conn.cursor() as cur:
-            cur.execute("UPDATE clientes SET activo=%s WHERE id=%s", (activo, cliente_id))
+            cur.execute("UPDATE clientes_sifen SET activo=%s WHERE id=%s", (activo, cliente_id))
             conn.commit()
             return cur.rowcount > 0
 
@@ -90,14 +90,14 @@ class RepositorioProductos:
             if busqueda:
                 cur.execute(f"""
                     SELECT id, codigo, descripcion, precio_unitario, unidad_medida, iva, activo
-                    FROM productos
+                    FROM productos_sifen
                     WHERE (descripcion ILIKE %s OR codigo ILIKE %s) {filtro_activo}
                     ORDER BY descripcion LIMIT 50
                 """, (f'%{busqueda}%', f'%{busqueda}%'))
             else:
                 cur.execute(f"""
                     SELECT id, codigo, descripcion, precio_unitario, unidad_medida, iva, activo
-                    FROM productos
+                    FROM productos_sifen
                     WHERE 1=1 {filtro_activo}
                     ORDER BY descripcion LIMIT 200
                 """)
@@ -108,7 +108,7 @@ class RepositorioProductos:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, codigo, descripcion, precio_unitario, unidad_medida, iva, activo "
-                "FROM productos WHERE id = %s", (producto_id,)
+                "FROM productos_sifen WHERE id = %s", (producto_id,)
             )
             return cur.fetchone()
 
@@ -117,7 +117,7 @@ class RepositorioProductos:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO productos (codigo, descripcion, precio_unitario, unidad_medida, iva)
+                INSERT INTO productos_sifen (codigo, descripcion, precio_unitario, unidad_medida, iva)
                 VALUES (%s, %s, %s, %s, %s) RETURNING id
             """, (codigo.strip() or None, descripcion.strip(), precio_unitario, unidad_medida, iva))
             conn.commit()
@@ -128,7 +128,7 @@ class RepositorioProductos:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
-                UPDATE productos SET codigo=%s, descripcion=%s, precio_unitario=%s,
+                UPDATE productos_sifen SET codigo=%s, descripcion=%s, precio_unitario=%s,
                                      unidad_medida=%s, iva=%s
                 WHERE id=%s
             """, (codigo.strip() or None, descripcion.strip(), precio_unitario,
@@ -139,6 +139,6 @@ class RepositorioProductos:
     def cambiar_estado(self, producto_id: int, activo: bool) -> bool:
         conn = self.db.conectar()
         with conn.cursor() as cur:
-            cur.execute("UPDATE productos SET activo=%s WHERE id=%s", (activo, producto_id))
+            cur.execute("UPDATE productos_sifen SET activo=%s WHERE id=%s", (activo, producto_id))
             conn.commit()
             return cur.rowcount > 0
