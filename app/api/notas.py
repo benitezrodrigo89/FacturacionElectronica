@@ -147,7 +147,7 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
         db.crear_base_si_no_existe()
         db.ejecutar_schema()
         repo       = RepositorioDE(db)
-        numero_doc = repo.proximo_numero_doc()
+        numero_doc = repo.proximo_numero_doc(tipo_documento=5)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Error de base de datos: {e}")
 
@@ -470,7 +470,7 @@ async def emitir_nota_remision(req: NotaRemisionRequest, _key: str = Depends(req
         db.crear_base_si_no_existe()
         db.ejecutar_schema()
         repo       = RepositorioDE(db)
-        numero_doc = repo.proximo_numero_doc()
+        numero_doc = repo.proximo_numero_doc(tipo_documento=7)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Error de base de datos: {e}")
     finally:

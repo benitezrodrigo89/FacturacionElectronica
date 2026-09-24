@@ -246,9 +246,9 @@ class KuDEGenerator:
             emisor_lines.append(Paragraph(f"Email: {cfg.email}", self._estilos['emisor_dato']))
 
         # Columna derecha: tipo de documento + número
-        estab   = data.get('establecimiento', '001')
-        punto   = data.get('punto', '001')
-        numero  = data.get('numero', '0000001')
+        estab   = str(data.get('establecimiento', '001')).zfill(3)
+        punto   = str(data.get('punto', '001')).zfill(3)
+        numero  = str(data.get('numero', 1)).zfill(7)
         nro_str = f"{estab}-{punto}-{numero}"
 
         col_doc = [
@@ -498,9 +498,9 @@ class KuDEGenerator:
             if ref.get('cdc'):
                 rows.append(['  CDC:', Paragraph(str(ref['cdc']), self._estilos['cdc'])])
             if ref.get('timbrado'):
-                estab  = str(ref.get('establecimiento', '')).zfill(3)
-                punto  = str(ref.get('punto', '')).zfill(3)
-                numero = str(ref.get('numero', '')).zfill(7)
+                estab  = str(ref.get('establecimiento', '001')).zfill(3)
+                punto  = str(ref.get('punto', '001')).zfill(3)
+                numero = str(ref.get('numero', 1)).zfill(7)
                 rows.append(['  Número:', f"{estab}-{punto}-{numero}"])
                 rows.append(['  Timbrado:', str(ref['timbrado'])])
             if ref.get('fecha'):

@@ -244,13 +244,14 @@ class RepositorioDE:
             )
             return cur.fetchone()
 
-    def obtener_por_numero_doc(self, numero_doc: int) -> Optional[dict]:
-        """Devuelve el registro de un DE por su número de documento, o None si no existe."""
+    def obtener_por_numero_doc(self, numero_doc: int, tipo_documento: int = 1) -> Optional[dict]:
+        """Devuelve el registro de un DE por su número y tipo de documento, o None si no existe."""
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, cdc, numero_doc, estado FROM documentos_electronicos WHERE numero_doc = %s LIMIT 1",
-                (numero_doc,)
+                "SELECT id, cdc, numero_doc, estado FROM documentos_electronicos "
+                "WHERE numero_doc = %s AND tipo_documento = %s LIMIT 1",
+                (numero_doc, tipo_documento)
             )
             return cur.fetchone()
 

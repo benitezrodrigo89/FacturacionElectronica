@@ -131,7 +131,7 @@ async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_ke
         repo = RepositorioDE(db)
         if req.numero_doc is not None:
             # Verificar que el número no esté ya registrado en la BD
-            existente = repo.obtener_por_numero_doc(req.numero_doc)
+            existente = repo.obtener_por_numero_doc(req.numero_doc, tipo_documento=1)
             if existente:
                 db.cerrar()
                 raise HTTPException(
