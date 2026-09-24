@@ -55,6 +55,52 @@ async def obtener_factura(cdc: str):
         db.cerrar()
 
 
+@router.get('/facturas/{cdc}/items', summary="Ítems del documento")
+async def obtener_items_factura(cdc: str):
+    """
+    Devuelve los ítems del documento almacenado en BD.
+    Útil para pre-cargar una NCE con los datos de la FE original.
+    """
+    import json
+    if len(cdc) != 44:
+        raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
+    db = Conexion()
+    try:
+        db.conectar()
+        repo = RepositorioDE(db)
+        fila = repo.obtener_por_cdc(cdc)
+        if not fila:
+            raise HTTPException(status_code=404, detail="Documento no encontrado")
+        fila = dict(fila)
+        data_json = fila.get('data_json')
+        if not data_json:
+            raise HTTPException(status_code=422, detail="Documento sin datos de ítems")
+        data = json.loads(data_json)
+        items = data.get('items', [])
+        return {
+            'cdc': cdc,
+            'numero_doc': fila.get('numero_doc'),
+            'monto_total': fila.get('monto_total'),
+            'items': [
+                {
+                    'codigo':          i.get('codigo', ''),
+                    'descripcion':     i.get('descripcion', ''),
+                    'cantidad':        i.get('cantidad', 1),
+                    'precioUnitario':  i.get('precioUnitario', 0),
+                    'iva':             i.get('iva', 10),
+                    'unidadMedida':    i.get('unidadMedida', 77),
+                }
+                for i in items
+            ],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.cerrar()
+
+
 @router.post('/facturas/{cdc}/consultar', summary="Consultar estado en SIFEN")
 async def consultar_sifen(cdc: str):
     """

@@ -224,6 +224,8 @@
       // Marcar seleccionada visualmente
       document.querySelectorAll('.factura-ref-item').forEach(b => b.classList.remove('active'));
       factura.classList.add('active');
+      // Cargar ítems de la factura
+      cargarItemsFactura(factura.dataset.cdc);
       return;
     }
 
@@ -239,6 +241,42 @@
       document.querySelectorAll('.factura-ref-item').forEach(b => b.classList.remove('active'));
     }
   });
+
+  async function cargarItemsFactura(cdc) {
+    const apiKey = document.getElementById('api-key')?.value || '';
+    try {
+      const resp = await fetch(`/api/v1/facturas/${cdc}/items`, {
+        headers: { 'X-API-Key': apiKey },
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (!data.items || !data.items.length) return;
+
+      // Limpiar tabla de ítems y cargar los de la factura
+      const tbody = document.getElementById('items-body');
+      tbody.innerHTML = '';
+      data.items.forEach(item => {
+        addItem(true);
+        const row = tbody.lastElementChild;
+        row.querySelector('.item-codigo').value = item.codigo || '';
+        const descEl = row.querySelector('.item-desc');
+        descEl.value = item.descripcion;
+        descEl.dataset.unidad = item.unidadMedida || '77';
+        row.querySelector('.item-qty').value   = item.cantidad;
+        row.querySelector('.item-price').value = item.precioUnitario;
+        const ivaEl = row.querySelector('.item-iva');
+        if (ivaEl) {
+          // Seleccionar la opción correcta de IVA
+          Array.from(ivaEl.options).forEach(o => {
+            o.selected = parseInt(o.value) === parseInt(item.iva);
+          });
+        }
+      });
+      updateTotal();
+    } catch (e) {
+      console.error('Error cargando ítems:', e);
+    }
+  }
 
   function submitNCE() {
     const items = getItems(true);
