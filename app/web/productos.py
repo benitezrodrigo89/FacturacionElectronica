@@ -16,8 +16,7 @@ _UNIDADES = {u['codigo']: f"{u['representacion']} — {u['descripcion']}"
 
 def _db_repo():
     db = Conexion()
-    db.crear_base_si_no_existe()
-    db.ejecutar_schema()
+    db.conectar()
     return db, RepositorioProductos(db)
 
 

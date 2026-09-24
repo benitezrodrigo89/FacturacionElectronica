@@ -13,8 +13,7 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / 'templa
 
 def _db_repo():
     db = Conexion()
-    db.crear_base_si_no_existe()
-    db.ejecutar_schema()
+    db.conectar()
     return db, RepositorioClientes(db)
 
 
