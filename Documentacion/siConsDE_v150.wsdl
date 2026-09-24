@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+             xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap12/"
+             xmlns:tns="http://ekuatia.set.gov.py/sifen/xsd"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+             targetNamespace="http://ekuatia.set.gov.py/sifen/xsd"
+             name="siConsDE">
+
+  <!-- Schema XML 9: siConsDE_v150.xsd — Request -->
+  <!-- Schema XML 10: resConsDE_v150.xsd — Response -->
+  <types>
+    <xsd:schema targetNamespace="http://ekuatia.set.gov.py/sifen/xsd">
+
+      <!-- Request: rEnviConsDe -->
+      <xsd:element name="rEnviConsDe">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="dId"  type="xsd:integer" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="dCDC" type="xsd:string"  minOccurs="1" maxOccurs="1"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- Response: rResEnviConsDe -->
+      <xsd:element name="rResEnviConsDe">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="dFecProc" type="xsd:string"  minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="dCodRes"  type="xsd:string"  minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="dMsgRes"  type="xsd:string"  minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="xContenDE" minOccurs="0" maxOccurs="1">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="rContDe" minOccurs="0" maxOccurs="1">
+                    <xsd:complexType>
+                      <xsd:sequence>
+                        <xsd:element name="rDE"      type="xsd:anyType" minOccurs="0"/>
+                        <xsd:element name="dProtAut" type="xsd:string"  minOccurs="0"/>
+                        <xsd:element name="xContEv"  type="xsd:anyType" minOccurs="0" maxOccurs="unbounded"/>
+                      </xsd:sequence>
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+    </xsd:schema>
+  </types>
+
+  <message name="ConsultaRequest">
+    <part name="parameters" element="tns:rEnviConsDe"/>
+  </message>
+  <message name="ConsultaResponse">
+    <part name="parameters" element="tns:rResEnviConsDe"/>
+  </message>
+
+  <portType name="siConsDEPortType">
+    <operation name="SiConsDE">
+      <input  message="tns:ConsultaRequest"/>
+      <output message="tns:ConsultaResponse"/>
+    </operation>
+  </portType>
+
+  <binding name="siConsDEBinding" type="tns:siConsDEPortType">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="SiConsDE">
+      <soap:operation soapAction=""/>
+      <input>  <soap:body use="literal"/> </input>
+      <output> <soap:body use="literal"/> </output>
+    </operation>
+  </binding>
+
+  <!-- URL apuntando al servidor de TEST de SIFEN -->
+  <service name="siConsDE">
+    <port name="siConsDEPort" binding="tns:siConsDEBinding">
+      <soap:address location="https://sifen-test.set.gov.py/de/ws/consultas/consulta.wsdl"/>
+    </port>
+  </service>
+
+</definitions>
