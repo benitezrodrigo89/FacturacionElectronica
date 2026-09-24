@@ -169,6 +169,11 @@ class KuDEGenerator:
         story.extend(self._seccion_receptor(data, tipo))
         story.append(Spacer(1, 3 * mm))
 
+        # Sección específica para NCE / NDE: motivo + documento referenciado
+        if tipo in (5, 6):
+            story.extend(self._seccion_nota_credito_debito(data, tipo))
+            story.append(Spacer(1, 3 * mm))
+
         # Items (solo para FE, AFE, NDE, NCE)
         if tipo in (1, 4, 5, 6):
             story.extend(self._seccion_items(data))
@@ -460,6 +465,51 @@ class KuDEGenerator:
         tabla.setStyle(self._estilo_tabla_datos())
         return [
             Paragraph('CONDICIÓN DE PAGO', self._estilos['seccion_titulo']),
+            tabla,
+        ]
+
+    def _seccion_nota_credito_debito(self, data: dict, tipo: int) -> list:
+        MOTIVOS = {
+            1: 'Devolución y Ajuste de precios',
+            2: 'Devolución',
+            3: 'Descuento',
+            4: 'Bonificación',
+            5: 'Crédito incobrable',
+            6: 'Recupero de costo',
+            7: 'Recupero de gasto',
+            8: 'Otros',
+        }
+        FORMATOS = {1: 'Electrónico', 2: 'Impreso', 3: 'Constancia Electrónica'}
+        titulo = 'DATOS DE LA NOTA DE CRÉDITO' if tipo == 5 else 'DATOS DE LA NOTA DE DÉBITO'
+
+        ncd = data.get('notaCreditoDebito', {})
+        motivo_cod = int(ncd.get('motivo', 8))
+        rows = [
+            ['Motivo:', MOTIVOS.get(motivo_cod, f'Código {motivo_cod}')],
+        ]
+
+        # Documento referenciado
+        docs_asoc = data.get('documentoAsociado', [])
+        if docs_asoc:
+            ref = docs_asoc[0] if isinstance(docs_asoc, list) else docs_asoc
+            formato_cod = int(ref.get('formato', 1))
+            rows.append(['Documento referenciado:', ''])
+            rows.append(['  Formato:', FORMATOS.get(formato_cod, str(formato_cod))])
+            if ref.get('cdc'):
+                rows.append(['  CDC:', Paragraph(str(ref['cdc']), self._estilos['cdc'])])
+            if ref.get('timbrado'):
+                estab  = str(ref.get('establecimiento', '')).zfill(3)
+                punto  = str(ref.get('punto', '')).zfill(3)
+                numero = str(ref.get('numero', '')).zfill(7)
+                rows.append(['  Número:', f"{estab}-{punto}-{numero}"])
+                rows.append(['  Timbrado:', str(ref['timbrado'])])
+            if ref.get('fecha'):
+                rows.append(['  Fecha emisión:', ref['fecha']])
+
+        tabla = Table(rows, colWidths=[_W_LABEL, _W_VALUE])
+        tabla.setStyle(self._estilo_tabla_datos())
+        return [
+            Paragraph(titulo, self._estilos['seccion_titulo']),
             tabla,
         ]
 
