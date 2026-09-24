@@ -292,7 +292,7 @@
     }
 
     const total  = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
-    const numRef = parseInt(document.getElementById('numero-ref').value) || null;
+    const numRef = null; // el número se deriva del CDC seleccionado
 
     const payload = {
       receptor: {
