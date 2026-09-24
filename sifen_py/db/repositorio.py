@@ -47,6 +47,7 @@ class RepositorioDE:
         razon_social_receptor: str           = None,
         monto_total:           int           = None,
         data_documento:        dict          = None,
+        cdc_doc_referenciado:  str           = None,
     ) -> int:
         """
         Inserta un DE en estado 'pendiente' antes de enviarlo a SIFEN.
@@ -61,12 +62,14 @@ class RepositorioDE:
                     cdc, numero_doc, establecimiento, punto_expedicion,
                     tipo_documento, fecha_emision, ruc_receptor,
                     razon_social_receptor, monto_total,
-                    xml_firmado, soap_envelope, data_json, estado, fecha_envio
+                    xml_firmado, soap_envelope, data_json, estado, fecha_envio,
+                    cdc_doc_referenciado
                 ) VALUES (
                     %(cdc)s, %(numero_doc)s, %(establecimiento)s, %(punto_expedicion)s,
                     %(tipo_documento)s, %(fecha_emision)s, %(ruc_receptor)s,
                     %(razon_social_receptor)s, %(monto_total)s,
-                    %(xml_firmado)s, %(soap_envelope)s, %(data_json)s, 'pendiente', NOW()
+                    %(xml_firmado)s, %(soap_envelope)s, %(data_json)s, 'pendiente', NOW(),
+                    %(cdc_doc_referenciado)s
                 )
                 ON CONFLICT (cdc) DO UPDATE SET
                     intentos      = documentos_electronicos.intentos + 1,
@@ -87,6 +90,7 @@ class RepositorioDE:
                 'xml_firmado':           xml_firmado,
                 'soap_envelope':         soap_envelope,
                 'data_json':             data_json_str,
+                'cdc_doc_referenciado':  cdc_doc_referenciado,
             })
             row = cur.fetchone()
             id_ = row[0] if isinstance(row, tuple) else row['id']
@@ -243,6 +247,19 @@ class RepositorioDE:
                 "SELECT * FROM documentos_electronicos WHERE cdc = %s", (cdc,)
             )
             return cur.fetchone()
+
+    def obtener_docs_referenciados_por(self, cdc: str) -> list:
+        """Devuelve NCE/NDE/NRE que referencian el CDC indicado (para mostrar en la FE)."""
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, cdc, numero_doc, tipo_documento, estado,
+                       monto_total, fecha_emision
+                FROM documentos_electronicos
+                WHERE cdc_doc_referenciado = %s
+                ORDER BY fecha_emision
+            """, (cdc,))
+            return cur.fetchall()
 
     def obtener_por_numero_doc(self, numero_doc: int, tipo_documento: int = 1) -> Optional[dict]:
         """Devuelve el registro de un DE por su número y tipo de documento, o None si no existe."""

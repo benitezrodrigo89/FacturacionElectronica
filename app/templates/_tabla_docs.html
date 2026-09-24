@@ -70,7 +70,7 @@
             </td>
             <td class="text-end text-nowrap">
               {% if doc.monto_total %}
-                <span class="fw-semibold">₲ {{ "{:,}".format(doc.monto_total | int).replace(',', '.') }}</span>
+                <span class="fw-semibold">Gs. {{ "{:,}".format(doc.monto_total | int).replace(',', '.') }}</span>
               {% else %}—{% endif %}
             </td>
             <td>
@@ -82,6 +82,19 @@
                 <span class="badge bg-secondary rounded-pill">Cancelado</span>
               {% else %}
                 <span class="badge badge-pendiente rounded-pill">Pendiente</span>
+              {% endif %}
+              {# Badge de documentos asociados (NCE/NDE/NRE) #}
+              {% set cdc = doc.cdc %}
+              {% if docs_ref is defined and cdc in docs_ref %}
+                {% for ref in docs_ref[cdc] %}
+                  {% set tipo_ref = ref.tipo_documento | int %}
+                  {% set label = 'NCE' if tipo_ref == 5 else ('NDE' if tipo_ref == 6 else 'NRE') %}
+                  {% set color = 'warning' if tipo_ref in (5,6) else 'secondary' %}
+                  <span class="badge bg-{{ color }} text-dark ms-1"
+                        title="{{ label }} N°{{ ref.numero_doc }} — Gs. {{ '{:,}'.format(ref.monto_total | int).replace(',','.') if ref.monto_total else '—' }} ({{ ref.estado }})">
+                    {{ label }}
+                  </span>
+                {% endfor %}
               {% endif %}
             </td>
             <td><code class="cdc">{{ doc.cdc[:16] }}…</code></td>

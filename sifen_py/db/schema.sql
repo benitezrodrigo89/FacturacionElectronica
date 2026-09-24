@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS documentos_electronicos (
     protocolo_autorizacion  VARCHAR(50),                 -- dProtAut (solo si aprobado)
     respuesta_xml           TEXT,                        -- XML completo de respuesta
 
+    -- Documento referenciado (para NCE, NDE, NRE)
+    cdc_doc_referenciado    VARCHAR(44),                 -- CDC de la FE/doc que origina esta NC/ND/NR
+
     -- Control
     intentos                INTEGER NOT NULL DEFAULT 1,
     fecha_envio             TIMESTAMPTZ,
@@ -39,6 +42,17 @@ CREATE INDEX IF NOT EXISTS idx_de_estado     ON documentos_electronicos (estado)
 CREATE INDEX IF NOT EXISTS idx_de_numero_doc ON documentos_electronicos (numero_doc);
 CREATE INDEX IF NOT EXISTS idx_de_fecha      ON documentos_electronicos (fecha_emision);
 CREATE INDEX IF NOT EXISTS idx_de_ruc_rec    ON documentos_electronicos (ruc_receptor);
+CREATE INDEX IF NOT EXISTS idx_de_cdc_ref    ON documentos_electronicos (cdc_doc_referenciado);
+
+-- Migración para BD existentes (agrega columna si no existe)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='documentos_electronicos' AND column_name='cdc_doc_referenciado'
+  ) THEN
+    ALTER TABLE documentos_electronicos ADD COLUMN cdc_doc_referenciado VARCHAR(44);
+  END IF;
+END $$;
 
 -- Trigger para actualizar updated_at automáticamente
 CREATE OR REPLACE FUNCTION actualizar_updated_at()

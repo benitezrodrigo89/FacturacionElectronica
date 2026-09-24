@@ -206,6 +206,7 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
     )
     total = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
     try:
+        cdc_ref = req.documento_referencia.cdc if req.documento_referencia else None
         repo.guardar_pendiente(
             cdc=cdc,
             numero_doc=numero_doc,
@@ -216,6 +217,7 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
             razon_social_receptor=req.receptor.razon_social,
             monto_total=total,
             data_documento={**data, 'timbrado': cfg['timbrado_numero']},
+            cdc_doc_referenciado=cdc_ref,
         )
     except Exception as e:
         db.cerrar()

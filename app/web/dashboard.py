@@ -39,12 +39,23 @@ async def tabla_documentos(
         repo = RepositorioDE(db)
         docs = _rows(repo.listar_por_estado(estado, limite=limit) if estado else repo.listar_recientes(limite=limit))
         resumen = repo.resumen_estados()
+
+        # Para cada FE/NDE/etc., buscar si tiene NCE/NDE asociada
+        docs_ref = {}
+        for doc in docs:
+            cdc = doc.get('cdc')
+            if cdc:
+                asociados = _rows(repo.obtener_docs_referenciados_por(cdc))
+                if asociados:
+                    docs_ref[cdc] = asociados
+
         db.cerrar()
     except Exception as e:
         error = str(e)
 
     return templates.TemplateResponse(request, '_tabla_docs.html', {
         "docs": docs,
+        "docs_ref": docs_ref,
         "resumen": resumen,
         "estado_filtro": estado,
         "error": error,
