@@ -18,7 +18,7 @@
       <input type="text" id="buscar-cliente" class="form-control form-control-sm"
              placeholder="Escribí razón social o RUC…"
              hx-get="/clientes/buscar" hx-trigger="keyup changed delay:300ms"
-             hx-target="#resultados-cliente" name="q_cliente" autocomplete="off">
+             hx-target="#resultados-cliente" name="q" autocomplete="off">
       <div id="resultados-cliente" class="list-group shadow-sm position-absolute w-100"
            style="z-index:1000; top:100%"></div>
     </div>

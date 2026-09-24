@@ -17,7 +17,7 @@ function addItem(showPrice = true) {
              hx-get="/productos/buscar"
              hx-trigger="keyup changed delay:300ms"
              hx-target="next .producto-dropdown"
-             name="q_producto">
+             name="q">
       <div class="producto-dropdown list-group shadow-sm position-absolute w-100" style="z-index:1000;top:100%"></div>
     </td>
     <td><input type="number" class="form-control form-control-sm item-qty" value="1" min="0.01" step="0.01" required></td>
