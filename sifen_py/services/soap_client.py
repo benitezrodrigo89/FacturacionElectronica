@@ -246,54 +246,41 @@ class SifenSOAPClient:
         if not cdc or len(cdc) != 44:
             raise SOAPException(f"CDC inválido (debe tener 44 dígitos): {cdc!r}")
 
+        # Nombre correcto confirmado contra SIFEN test: rEnviConsDeRequest / rEnviConsDeResponse
+        # (el Manual Técnico v150 lo documenta como rEnviConsDe pero SIFEN espera el sufijo Request)
+        ns_sifen     = 'http://ekuatia.set.gov.py/sifen/xsd'
+        envelope_str = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"'
+            f' xmlns:xsd="{ns_sifen}">'
+            '<soap:Header/>'
+            '<soap:Body>'
+            '<xsd:rEnviConsDeRequest>'
+            '<xsd:dId>1</xsd:dId>'
+            f'<xsd:dCDC>{cdc}</xsd:dCDC>'
+            '</xsd:rEnviConsDeRequest>'
+            '</soap:Body>'
+            '</soap:Envelope>'
+        )
+        envelope = envelope_str.encode('utf-8')
+        headers  = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+
         url     = self.URLS_CONSULTA_DE[self.config.ambiente]
         session = self._get_session()
 
-        # Intenta SOAP 1.2 primero; si responde 0160 "XML Mal Formado" prueba SOAP 1.1
-        for soap_version in ('1.2', '1.1'):
-            if soap_version == '1.2':
-                ns_env   = 'http://www.w3.org/2003/05/soap-envelope'
-                ct       = 'application/soap+xml;charset=UTF-8'
-                env_tag  = 'env'
-            else:
-                ns_env   = 'http://schemas.xmlsoap.org/soap/envelope/'
-                ct       = 'text/xml;charset=UTF-8'
-                env_tag  = 'soap'
+        logger.info(f"Consultando DE: {url}")
+        logger.debug(f"Envelope:\n{envelope_str}")
+        try:
+            resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
+        except Exception as e:
+            raise SOAPException(f"Error HTTP al consultar DE: {e}") from e
 
-            envelope_str = (
-                '<?xml version="1.0" encoding="UTF-8"?>'
-                f'<{env_tag}:Envelope xmlns:{env_tag}="{ns_env}">'
-                f'<{env_tag}:Header/>'
-                f'<{env_tag}:Body>'
-                '<rEnviConsDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
-                '<dId>1</dId>'
-                f'<dCDC>{cdc}</dCDC>'
-                '</rEnviConsDe>'
-                f'</{env_tag}:Body>'
-                f'</{env_tag}:Envelope>'
-            )
-            envelope = envelope_str.encode('utf-8')
-            headers  = {'Content-Type': ct, 'SOAPAction': ''}
-
-            logger.info(f"Consultando DE (SOAP {soap_version}): {url}")
-            logger.debug(f"Envelope:\n{envelope_str}")
-            try:
-                resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
-            except Exception as e:
-                raise SOAPException(f"Error HTTP al consultar DE: {e}") from e
-
-            logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
-            logger.debug(f"Respuesta:\n{resp.content.decode('utf-8', errors='replace')}")
-
-            resultado = self._parsear_respuesta_consulta_de_xml(resp.content)
-
-            # Si devuelve 0160 "XML Mal Formado" con SOAP 1.2, reintenta con SOAP 1.1
-            if resultado.codigo == '0160' and 'Mal Formado' in resultado.descripcion and soap_version == '1.2':
-                logger.warning("SOAP 1.2 devolvió 0160 XML Mal Formado — reintentando con SOAP 1.1")
-                continue
-            return resultado
-
-        return resultado
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        logger.debug(f"Respuesta:\n{resp.content.decode('utf-8', errors='replace')}")
+        return self._parsear_respuesta_consulta_de_xml(resp.content)
 
     def consultar_ruc_directo(self, ruc: str) -> RespuestaSIFEN:
         """
@@ -777,38 +764,31 @@ class SifenSOAPClient:
                 return self._parsear_respuesta_xml(xml_bytes)
 
             # Extraer datos del contenedor del DE (solo si 0422)
+            # xContenDE viene como CDATA con XML embebido: <rDE>...</rDE><dProtAut>...</dProtAut><xContEv>...</xContEv>
             protocolo = ''
             xml_de    = ''
             eventos   = []
 
             if codigo == '0422':
-                cont_de = _el('rContDe')
-                if cont_de is not None:
-                    protocolo = _txt('dProtAut', cont_de)
-                    # XML completo del DE
-                    rde_el = cont_de.find('{%s}rDE' % ns)
-                    if rde_el is not None:
-                        xml_de = etree.tostring(rde_el, encoding='unicode')
+                cont_el = _el('xContenDE')
+                if cont_el is not None:
+                    cdata_str = cont_el.text or ''
+                    # Extraer dProtAut directamente del texto CDATA con búsqueda simple
+                    import re as _re
+                    m_prot = _re.search(r'<dProtAut[^>]*>(\d+)</dProtAut>', cdata_str)
+                    if m_prot:
+                        protocolo = m_prot.group(1)
 
-                    # Eventos asociados (xContEv puede haber 0-n)
-                    for ev_el in cont_de.findall('.//{%s}xContEv' % ns):
-                        tipo_ev  = _txt('dTipEve', ev_el)
-                        cod_ev   = _txt('dCodRes', ev_el)   # resultado del evento
-                        msg_ev   = _txt('dMsgRes', ev_el)
-                        prot_ev  = _txt('dProtAut', ev_el)
-                        fecha_ev = _txt('dFecProc', ev_el)
-                        # Obtener tipo del XML del evento
-                        for tag_ev in ('dMotEve', 'dMotInu', 'dTipoConfor'):
-                            val = _txt(tag_ev, ev_el)
-                            if val:
-                                break
-                        eventos.append({
-                            'tipo':     tipo_ev,
-                            'codigo':   cod_ev,
-                            'mensaje':  msg_ev,
-                            'protocolo': prot_ev,
-                            'fecha':    fecha_ev,
-                        })
+                    # Extraer XML del DE (todo el bloque rDE)
+                    m_de = _re.search(r'(<rDE\b.*?</rDE>)', cdata_str, _re.DOTALL)
+                    if m_de:
+                        xml_de = m_de.group(1)
+
+                    # Detectar eventos (xContEv con contenido)
+                    m_ev = _re.findall(r'<xContEv>(.*?)</xContEv>', cdata_str, _re.DOTALL)
+                    for ev_str in m_ev:
+                        if ev_str.strip():
+                            eventos.append({'xml': ev_str.strip()})
 
             # Determinar estado real considerando eventos
             estado_real = 'Aprobado' if codigo == '0422' else ''
