@@ -82,14 +82,15 @@ function getItems(withPrice = true) {
 function mostrarResultado(data, ok) {
   const el = document.getElementById('resultado');
   if (ok) {
-    const estado = data.estado === 'aprobado'
+    const aprobado = data.estado === 'aprobado';
+    const estado = aprobado
       ? '<span class="badge bg-success">Aprobado</span>'
       : '<span class="badge bg-danger">Rechazado</span>';
     el.innerHTML = `
-      <div class="alert alert-${data.estado === 'aprobado' ? 'success' : 'danger'} mt-3">
+      <div class="alert alert-${aprobado ? 'success' : 'danger'} mt-3">
         <div class="d-flex justify-content-between align-items-start">
-          <h6 class="mb-2"><i class="bi bi-check-circle me-1"></i>Documento emitido</h6>
-          ${data.estado === 'aprobado' ? `<a href="${data.kude_url}" class="btn btn-sm btn-outline-primary" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>Descargar KuDE</a>` : ''}
+          <h6 class="mb-2"><i class="bi bi-${aprobado ? 'check' : 'x'}-circle me-1"></i>Documento emitido</h6>
+          ${aprobado ? `<a href="${data.kude_url}" class="btn btn-sm btn-outline-primary" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>KuDE</a>` : ''}
         </div>
         <div class="row g-1 small">
           <div class="col-12"><strong>CDC:</strong> <code class="small">${data.cdc}</code></div>
@@ -98,7 +99,18 @@ function mostrarResultado(data, ok) {
           <div class="col-md-6"><strong>SIFEN:</strong> ${data.codigo_sifen} — ${data.descripcion_sifen}</div>
           ${data.protocolo_autorizacion ? `<div class="col-12"><strong>Protocolo:</strong> ${data.protocolo_autorizacion}</div>` : ''}
         </div>
+        ${aprobado ? `<div class="mt-2 small text-success">Redirigiendo al dashboard en <span id="countdown">4</span>s… <a href="/" class="text-success fw-semibold">ir ahora</a></div>` : ''}
       </div>`;
+    // Si fue aprobado, redirigir al dashboard con countdown
+    if (aprobado) {
+      let seg = 4;
+      const timer = setInterval(() => {
+        seg--;
+        const cd = document.getElementById('countdown');
+        if (cd) cd.textContent = seg;
+        if (seg <= 0) { clearInterval(timer); window.location.href = '/'; }
+      }, 1000);
+    }
   } else {
     el.innerHTML = `<div class="alert alert-danger mt-3"><i class="bi bi-exclamation-triangle me-1"></i>${data.detail || JSON.stringify(data)}</div>`;
   }
