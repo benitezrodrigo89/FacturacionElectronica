@@ -3,7 +3,9 @@
 {% else %}
 
 <!-- Tarjetas de resumen -->
+{% set rt = resumen_tipo if resumen_tipo is defined else {} %}
 <div class="row g-3 mb-4">
+  {# — Estados — #}
   <div class="col-6 col-md-2">
     <div class="card text-center p-3">
       <div class="stat-number text-success">{{ resumen.get('aprobado', 0) }}</div>
@@ -28,16 +30,37 @@
       <div class="small text-muted mt-1">Cancelados</div>
     </div>
   </div>
-  <div class="col-6 col-md-2">
+</div>
+{# — Por tipo de documento (aprobados) — #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md">
     <div class="card text-center p-3">
-      <div class="stat-number text-primary">{{ (resumen_tipo if resumen_tipo is defined else {}).get(1, 0) }}</div>
-      <div class="small text-muted mt-1"><span class="badge bg-primary">FE</span> Aprobadas</div>
+      <div class="stat-number text-primary">{{ rt.get(1, 0) }}</div>
+      <div class="small text-muted mt-1"><span class="badge bg-primary">FE</span> Facturas</div>
     </div>
   </div>
-  <div class="col-6 col-md-2">
+  <div class="col-6 col-md">
     <div class="card text-center p-3">
-      <div class="stat-number text-warning">{{ (resumen_tipo if resumen_tipo is defined else {}).get(5, 0) }}</div>
-      <div class="small text-muted mt-1"><span class="badge bg-warning text-dark">NCE</span> Aprobadas</div>
+      <div class="stat-number text-info">{{ rt.get(4, 0) }}</div>
+      <div class="small text-muted mt-1"><span class="badge bg-info text-dark">AFE</span> Autofacturas</div>
+    </div>
+  </div>
+  <div class="col-6 col-md">
+    <div class="card text-center p-3">
+      <div class="stat-number text-warning">{{ rt.get(5, 0) }}</div>
+      <div class="small text-muted mt-1"><span class="badge bg-warning text-dark">NCE</span> Notas Crédito</div>
+    </div>
+  </div>
+  <div class="col-6 col-md">
+    <div class="card text-center p-3">
+      <div class="stat-number text-warning">{{ rt.get(6, 0) }}</div>
+      <div class="small text-muted mt-1"><span class="badge bg-warning text-dark">NDE</span> Notas Débito</div>
+    </div>
+  </div>
+  <div class="col-6 col-md">
+    <div class="card text-center p-3">
+      <div class="stat-number text-secondary">{{ rt.get(7, 0) }}</div>
+      <div class="small text-muted mt-1"><span class="badge bg-secondary">NRE</span> Remisiones</div>
     </div>
   </div>
 </div>
