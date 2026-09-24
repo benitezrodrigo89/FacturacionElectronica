@@ -59,14 +59,31 @@ class Conexion:
         return conn.cursor(cursor_factory=factory)
 
     def ejecutar_schema(self, schema_path: str = None):
-        """Crea las tablas si no existen ejecutando schema.sql."""
+        """Crea/migra tablas ejecutando schema.sql sentencia por sentencia."""
         if schema_path is None:
             schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
         with open(schema_path, 'r', encoding='utf-8') as f:
             sql = f.read()
+
+        # Dividir en sentencias individuales respetando bloques DO $$...$$
+        import re
+        # Extraer bloques DO $$ ... $$ como una sola sentencia
+        bloques = re.split(r'(DO\s+\$\$.*?\$\$\s*;)', sql, flags=re.DOTALL | re.IGNORECASE)
+        sentencias = []
+        for bloque in bloques:
+            if re.match(r'DO\s+\$\$', bloque, re.IGNORECASE):
+                sentencias.append(bloque.strip())
+            else:
+                for s in bloque.split(';'):
+                    s = s.strip()
+                    if s:
+                        sentencias.append(s + ';')
+
         conn = self.conectar()
         with conn.cursor() as cur:
-            cur.execute(sql)
+            for sentencia in sentencias:
+                if sentencia.strip(';').strip():
+                    cur.execute(sentencia)
         conn.commit()
         logger.info("Schema aplicado correctamente")
 
