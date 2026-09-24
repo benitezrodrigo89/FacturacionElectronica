@@ -32,8 +32,21 @@ async def facturas_aprobadas_por_ruc(request: Request, ruc: str = ''):
             db = Conexion()
             db.conectar()
             repo = RepositorioDE(db)
-            facturas = _rows(repo.listar_aprobadas_por_ruc(ruc.strip()))
+            filas = _rows(repo.listar_aprobadas_por_ruc(ruc.strip()))
             db.cerrar()
+            for f in filas:
+                estab  = str(f.get('establecimiento', '001')).zfill(3)
+                punto  = str(f.get('punto_expedicion', '001')).zfill(3)
+                numero = str(f.get('numero_doc', 1)).zfill(7)
+                monto  = int(f.get('monto_total') or 0)
+                fecha  = f['fecha_emision'].strftime('%d/%m/%Y') if f.get('fecha_emision') else '—'
+                facturas.append({
+                    'cdc':    f['cdc'],
+                    'nro':    f"{estab}-{punto}-{numero}",
+                    'monto':  monto,
+                    'monto_str': f"Gs. {monto:,}".replace(',', '.'),
+                    'fecha':  fecha,
+                })
         except Exception:
             pass
     return templates.TemplateResponse(request, '_facturas_selector.html',
