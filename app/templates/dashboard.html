@@ -133,7 +133,7 @@ async function consultarEstado(cdc, btn) {
           <tr><th>Descripción</th><td>${data.descripcion}</td></tr>
           ${data.protocolo_autorizacion ? `<tr><th>Protocolo</th><td><strong>${data.protocolo_autorizacion}</strong></td></tr>` : ''}
         </table>`;
-      htmx.trigger('#content', 'load');
+      htmx.ajax('GET', '/documentos-tabla', {target: '#content', swap: 'innerHTML'});
     } else {
       body.innerHTML = `<div class="alert alert-danger mb-0">${data.detail || 'Error al consultar'}</div>`;
     }
@@ -181,10 +181,10 @@ async function confirmarAnulacion() {
         <strong>Estado:</strong> ${data.estado}
       </div>`;
       res.className = '';
-      // Recargar tabla después de 1.5s
+      // Cerrar modal y recargar tabla
       setTimeout(() => {
         bootstrap.Modal.getInstance(document.getElementById('modalAnular')).hide();
-        htmx.trigger('#content', 'load');
+        htmx.ajax('GET', '/documentos-tabla', {target: '#content', swap: 'innerHTML'});
       }, 1500);
     } else {
       res.innerHTML = `<div class="alert alert-danger mb-0">${data.detail || 'Error al anular'}</div>`;
