@@ -246,18 +246,16 @@ class SifenSOAPClient:
         if not cdc or len(cdc) != 44:
             raise SOAPException(f"CDC inválido (debe tener 44 dígitos): {cdc!r}")
 
-        # rConsultaDE es el nombre de la operación en el WSDL (usado por zeep).
-        # rEnviConsDe es el nombre del elemento raíz en el Schema XML 9.
-        # SIFEN puede esperar cualquiera de los dos — usamos rConsultaDE primero.
+        # El elemento raíz correcto según el Schema XML es rEnviConsDe (§9 Manual Técnico)
         envelope_str = (
             '<?xml version="1.0" encoding="UTF-8"?>'
             '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
             '<env:Header/>'
             '<env:Body>'
-            '<rConsultaDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<rEnviConsDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
             '<dId>1</dId>'
             f'<dCDC>{cdc}</dCDC>'
-            '</rConsultaDE>'
+            '</rEnviConsDe>'
             '</env:Body>'
             '</env:Envelope>'
         )

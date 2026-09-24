@@ -190,6 +190,43 @@ async def consultar_sifen(cdc: str):
     }
 
 
+@router.post('/facturas/{cdc}/sincronizar-estado', summary="Sincronizar estado manualmente")
+async def sincronizar_estado(cdc: str, estado: str):
+    """
+    Fuerza la actualización del estado de un documento en la BD local.
+    Útil para corregir desincronismos cuando la BD quedó desactualizada.
+
+    **Estados válidos:** `aprobado`, `rechazado`, `cancelado`, `pendiente`
+    """
+    estados_validos = ('aprobado', 'rechazado', 'cancelado', 'pendiente', 'error')
+    if len(cdc) != 44:
+        raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
+    if estado not in estados_validos:
+        raise HTTPException(status_code=400,
+                            detail=f"Estado inválido. Válidos: {estados_validos}")
+    db = Conexion()
+    try:
+        db.conectar()
+        repo = RepositorioDE(db)
+        fila = repo.obtener_por_cdc(cdc)
+        if not fila:
+            raise HTTPException(status_code=404, detail="Documento no encontrado")
+        conn = db.conectar()
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE documentos_electronicos SET estado = %s, updated_at = NOW() WHERE cdc = %s",
+                (estado, cdc)
+            )
+        conn.commit()
+        db.cerrar()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"cdc": cdc, "estado_actualizado": estado, "mensaje": "Estado actualizado en BD local"}
+
+
 @router.get('/resumen', summary="Resumen de documentos por estado")
 async def resumen():
     db = Conexion()
