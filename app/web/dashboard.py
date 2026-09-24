@@ -62,6 +62,8 @@ async def tabla_documentos(
     """Fragmento HTMX: resumen + tabla de documentos."""
     docs = []
     resumen = {}
+    resumen_tipo = {}
+    docs_ref = {}
     error = None
     try:
         db = Conexion()
@@ -69,9 +71,9 @@ async def tabla_documentos(
         repo = RepositorioDE(db)
         docs = _rows(repo.listar_por_estado(estado, limite=limit) if estado else repo.listar_recientes(limite=limit))
         resumen = repo.resumen_estados()
+        resumen_tipo = repo.resumen_por_tipo()
 
         # Para cada FE/NDE/etc., buscar si tiene NCE/NDE asociada
-        docs_ref = {}
         for doc in docs:
             cdc = doc.get('cdc')
             if cdc:
@@ -87,6 +89,7 @@ async def tabla_documentos(
         "docs": docs,
         "docs_ref": docs_ref,
         "resumen": resumen,
+        "resumen_tipo": resumen_tipo,
         "estado_filtro": estado,
         "error": error,
     })

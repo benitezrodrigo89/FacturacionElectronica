@@ -4,28 +4,40 @@
 
 <!-- Tarjetas de resumen -->
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-2">
     <div class="card text-center p-3">
       <div class="stat-number text-success">{{ resumen.get('aprobado', 0) }}</div>
       <div class="small text-muted mt-1">Aprobados</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-2">
     <div class="card text-center p-3">
       <div class="stat-number text-danger">{{ resumen.get('rechazado', 0) }}</div>
       <div class="small text-muted mt-1">Rechazados</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-2">
     <div class="card text-center p-3">
       <div class="stat-number text-warning">{{ resumen.get('pendiente', 0) }}</div>
       <div class="small text-muted mt-1">Pendientes</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-2">
     <div class="card text-center p-3">
-      <div class="stat-number text-primary">{{ resumen.values() | sum }}</div>
-      <div class="small text-muted mt-1">Total</div>
+      <div class="stat-number text-secondary">{{ resumen.get('cancelado', 0) }}</div>
+      <div class="small text-muted mt-1">Cancelados</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center p-3">
+      <div class="stat-number text-primary">{{ (resumen_tipo if resumen_tipo is defined else {}).get(1, 0) }}</div>
+      <div class="small text-muted mt-1"><span class="badge bg-primary">FE</span> Aprobadas</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center p-3">
+      <div class="stat-number text-warning">{{ (resumen_tipo if resumen_tipo is defined else {}).get(5, 0) }}</div>
+      <div class="small text-muted mt-1"><span class="badge bg-warning text-dark">NCE</span> Aprobadas</div>
     </div>
   </div>
 </div>

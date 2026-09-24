@@ -373,6 +373,20 @@ class RepositorioDE:
             rows = cur.fetchall()
         return {r['estado']: r['total'] for r in rows}
 
+    def resumen_por_tipo(self) -> dict:
+        """Devuelve conteo de documentos aprobados por tipo."""
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT tipo_documento, COUNT(*) AS total
+                FROM documentos_electronicos
+                WHERE estado = 'aprobado'
+                GROUP BY tipo_documento
+                ORDER BY tipo_documento
+            """)
+            rows = cur.fetchall()
+        return {r['tipo_documento']: r['total'] for r in rows}
+
 
 # ─────────────────────────────────────────────────────────────────────
 # HELPERS
