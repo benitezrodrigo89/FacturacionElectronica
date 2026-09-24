@@ -246,38 +246,54 @@ class SifenSOAPClient:
         if not cdc or len(cdc) != 44:
             raise SOAPException(f"CDC inválido (debe tener 44 dígitos): {cdc!r}")
 
-        # El elemento raíz correcto según el Schema XML es rEnviConsDe (§9 Manual Técnico)
-        envelope_str = (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
-            '<env:Header/>'
-            '<env:Body>'
-            '<rEnviConsDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
-            '<dId>1</dId>'
-            f'<dCDC>{cdc}</dCDC>'
-            '</rEnviConsDe>'
-            '</env:Body>'
-            '</env:Envelope>'
-        )
-        envelope = envelope_str.encode('ascii')
-
         url     = self.URLS_CONSULTA_DE[self.config.ambiente]
         session = self._get_session()
-        headers = {
-            'Content-Type': 'application/soap+xml;charset=UTF-8',
-            'SOAPAction':   '',
-        }
 
-        logger.info(f"Consultando DE directo: {url}")
-        logger.debug(f"Envelope consulta DE:\n{envelope.decode('ascii')}")
-        try:
-            resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
-        except Exception as e:
-            raise SOAPException(f"Error HTTP al consultar DE: {e}") from e
+        # Intenta SOAP 1.2 primero; si responde 0160 "XML Mal Formado" prueba SOAP 1.1
+        for soap_version in ('1.2', '1.1'):
+            if soap_version == '1.2':
+                ns_env   = 'http://www.w3.org/2003/05/soap-envelope'
+                ct       = 'application/soap+xml;charset=UTF-8'
+                env_tag  = 'env'
+            else:
+                ns_env   = 'http://schemas.xmlsoap.org/soap/envelope/'
+                ct       = 'text/xml;charset=UTF-8'
+                env_tag  = 'soap'
 
-        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
-        logger.debug(f"Respuesta consulta DE:\n{resp.content.decode('utf-8', errors='replace')}")
-        return self._parsear_respuesta_consulta_de_xml(resp.content)
+            envelope_str = (
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                f'<{env_tag}:Envelope xmlns:{env_tag}="{ns_env}">'
+                f'<{env_tag}:Header/>'
+                f'<{env_tag}:Body>'
+                '<rEnviConsDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+                '<dId>1</dId>'
+                f'<dCDC>{cdc}</dCDC>'
+                '</rEnviConsDe>'
+                f'</{env_tag}:Body>'
+                f'</{env_tag}:Envelope>'
+            )
+            envelope = envelope_str.encode('utf-8')
+            headers  = {'Content-Type': ct, 'SOAPAction': ''}
+
+            logger.info(f"Consultando DE (SOAP {soap_version}): {url}")
+            logger.debug(f"Envelope:\n{envelope_str}")
+            try:
+                resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
+            except Exception as e:
+                raise SOAPException(f"Error HTTP al consultar DE: {e}") from e
+
+            logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+            logger.debug(f"Respuesta:\n{resp.content.decode('utf-8', errors='replace')}")
+
+            resultado = self._parsear_respuesta_consulta_de_xml(resp.content)
+
+            # Si devuelve 0160 "XML Mal Formado" con SOAP 1.2, reintenta con SOAP 1.1
+            if resultado.codigo == '0160' and 'Mal Formado' in resultado.descripcion and soap_version == '1.2':
+                logger.warning("SOAP 1.2 devolvió 0160 XML Mal Formado — reintentando con SOAP 1.1")
+                continue
+            return resultado
+
+        return resultado
 
     def consultar_ruc_directo(self, ruc: str) -> RespuestaSIFEN:
         """
