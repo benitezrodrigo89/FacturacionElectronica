@@ -749,39 +749,92 @@ class SifenSOAPClient:
     def _parsear_respuesta_consulta_de_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:
         """
         Parsea la respuesta SOAP de rResEnviConsDe (consulta por CDC).
-        Schema XML 10: resConsDE_v150.xsd
+        Schema XML 10 + 11 + 12: resConsDE_v150.xsd
 
         Respuesta exitosa (0422):
-            dCodRes  = 0422
-            dMsgRes  = 'CDC encontrado'
-            xContenDE/rContDe/dProtAut = protocolo de autorización
+            dCodRes   = 0422 — CDC encontrado
+            xContenDE/rContDe:
+                rDE       — XML completo del DE firmado
+                dProtAut  — número de protocolo de autorización
+                xContEv   — eventos asociados (cancelaciones, conformidades, etc.)
         """
         try:
             root = etree.fromstring(xml_bytes)
             ns   = 'http://ekuatia.set.gov.py/sifen/xsd'
 
-            def _txt(tag):
-                el = root.find('.//{%s}%s' % (ns, tag))
+            def _txt(tag, parent=None):
+                el = (parent or root).find('.//{%s}%s' % (ns, tag))
                 return el.text.strip() if el is not None and el.text else ''
+
+            def _el(tag, parent=None):
+                return (parent or root).find('.//{%s}%s' % (ns, tag))
 
             codigo    = _txt('dCodRes')
             desc      = _txt('dMsgRes')
-            protocolo = _txt('dProtAut')   # dentro de xContenDE/rContDe
             fecha     = _txt('dFecProc')
 
             if not codigo:
                 return self._parsear_respuesta_xml(xml_bytes)
 
+            # Extraer datos del contenedor del DE (solo si 0422)
+            protocolo = ''
+            xml_de    = ''
+            eventos   = []
+
+            if codigo == '0422':
+                cont_de = _el('rContDe')
+                if cont_de is not None:
+                    protocolo = _txt('dProtAut', cont_de)
+                    # XML completo del DE
+                    rde_el = cont_de.find('{%s}rDE' % ns)
+                    if rde_el is not None:
+                        xml_de = etree.tostring(rde_el, encoding='unicode')
+
+                    # Eventos asociados (xContEv puede haber 0-n)
+                    for ev_el in cont_de.findall('.//{%s}xContEv' % ns):
+                        tipo_ev  = _txt('dTipEve', ev_el)
+                        cod_ev   = _txt('dCodRes', ev_el)   # resultado del evento
+                        msg_ev   = _txt('dMsgRes', ev_el)
+                        prot_ev  = _txt('dProtAut', ev_el)
+                        fecha_ev = _txt('dFecProc', ev_el)
+                        # Obtener tipo del XML del evento
+                        for tag_ev in ('dMotEve', 'dMotInu', 'dTipoConfor'):
+                            val = _txt(tag_ev, ev_el)
+                            if val:
+                                break
+                        eventos.append({
+                            'tipo':     tipo_ev,
+                            'codigo':   cod_ev,
+                            'mensaje':  msg_ev,
+                            'protocolo': prot_ev,
+                            'fecha':    fecha_ev,
+                        })
+
+            # Determinar estado real considerando eventos
+            estado_real = 'Aprobado' if codigo == '0422' else ''
+            cancelado = any(
+                e.get('tipo') in ('1', 'cancelacion', 'cancel') or 'cancel' in e.get('mensaje','').lower()
+                for e in eventos
+            )
+            if cancelado:
+                estado_real = 'Cancelado'
+
             raw = {
-                'xml':       xml_bytes.decode('utf-8', errors='replace'),
-                'protocolo': protocolo,
-                'fecha':     fecha,
-                'estado':    'Aprobado' if codigo == '0422' else '',
+                'xml':        xml_bytes.decode('utf-8', errors='replace'),
+                'xml_de':     xml_de,
+                'protocolo':  protocolo,
+                'fecha':      fecha,
+                'estado':     estado_real,
+                'eventos':    eventos,
+                'cancelado':  cancelado,
             }
 
             resp = RespuestaSIFEN(codigo, desc, raw)
             if protocolo:
-                logger.success(f"Consulta DE — código: {codigo} | Protocolo: {protocolo}")
+                logger.success(
+                    f"Consulta DE — código: {codigo} | Protocolo: {protocolo}"
+                    + (f" | Cancelado: {cancelado}" if eventos else '')
+                )
             else:
                 logger.info(f"Consulta DE — código: {codigo} | {desc}")
             return resp

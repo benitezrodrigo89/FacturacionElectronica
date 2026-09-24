@@ -143,9 +143,13 @@ async def consultar_sifen(cdc: str):
         error_conexion = str(e)
         logger.warning(f"No se pudo conectar a SIFEN para consultar {cdc}: {e}")
 
-    # 3. Si SIFEN respondió con 0422/0420, actualizar BD
+    # 3. Si SIFEN respondió, sincronizar estado en BD
     if resp_sifen and resp_sifen.codigo in ('0422', '0420'):
         try:
+            cancelado   = resp_sifen.raw.get('cancelado', False)
+            estado_real = 'cancelado' if cancelado else (
+                'aprobado' if resp_sifen.codigo == '0422' else 'rechazado'
+            )
             db2 = Conexion()
             db2.conectar()
             repo2 = RepositorioDE(db2)
@@ -156,21 +160,34 @@ async def consultar_sifen(cdc: str):
                 protocolo=resp_sifen.raw.get('protocolo'),
                 respuesta_xml=resp_sifen.raw.get('xml'),
             )
+            # Si SIFEN indica cancelado pero BD local no lo tiene, corregir
+            if cancelado and fila.get('estado') != 'cancelado':
+                conn = db2.conectar()
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE documentos_electronicos SET estado='cancelado', updated_at=NOW() WHERE cdc=%s",
+                        (cdc,)
+                    )
+                conn.commit()
+                fila['estado'] = 'cancelado'
+            else:
+                fila['estado'] = estado_real
             db2.cerrar()
-            fila['estado'] = 'aprobado' if resp_sifen.codigo == '0422' else 'rechazado'
         except Exception:
             pass
 
     # 4. Construir respuesta — priorizar datos de SIFEN sobre BD local
     if resp_sifen:
-        codigo    = resp_sifen.codigo
+        codigo      = resp_sifen.codigo
         descripcion = resp_sifen.descripcion
         protocolo   = resp_sifen.raw.get('protocolo') or fila.get('protocolo_autorizacion')
+        eventos     = resp_sifen.raw.get('eventos', [])
         fuente      = 'sifen'
     else:
         codigo      = fila.get('codigo_sifen', '')
         descripcion = fila.get('descripcion_sifen', '')
         protocolo   = fila.get('protocolo_autorizacion')
+        eventos     = []
         fuente      = 'bd_local'
 
     estado_labels = {
@@ -185,6 +202,7 @@ async def consultar_sifen(cdc: str):
         "codigo_sifen":           codigo,
         "descripcion":            descripcion,
         "protocolo_autorizacion": protocolo,
+        "eventos":                eventos,
         "fuente":                 fuente,
         "error_conexion":         error_conexion,
     }
