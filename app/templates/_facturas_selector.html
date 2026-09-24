@@ -1,0 +1,36 @@
+{% if facturas %}
+<div class="mt-2">
+  <label class="form-label text-muted small fw-semibold">
+    <i class="bi bi-file-earmark-text me-1"></i>Facturas aprobadas del receptor — seleccioná la que querés acreditar
+  </label>
+  <div class="list-group">
+    {% for f in facturas %}
+    {% set estab  = f.establecimiento | string | rjust(3, '0') %}
+    {% set punto  = f.punto_expedicion | string | rjust(3, '0') %}
+    {% set numero = f.numero_doc | string | rjust(7, '0') %}
+    {% set nro_str = estab ~ '-' ~ punto ~ '-' ~ numero %}
+    {% set fecha_str = f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else '—' %}
+    {% set monto_str = 'Gs. ' ~ '{:,}'.format(f.monto_total | int).replace(',', '.') if f.monto_total else '—' %}
+    <button type="button"
+            class="list-group-item list-group-item-action py-2 factura-ref-item"
+            data-cdc="{{ f.cdc }}"
+            data-nro="{{ nro_str }}"
+            data-monto="{{ f.monto_total or 0 }}"
+            data-fecha="{{ fecha_str }}">
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="fw-semibold font-monospace small">{{ nro_str }}</span>
+        <span class="fw-semibold text-primary small">{{ monto_str }}</span>
+      </div>
+      <div class="text-muted" style="font-size:.75rem">
+        {{ fecha_str }} &nbsp;·&nbsp;
+        <span class="font-monospace">{{ f.cdc[:20] }}…</span>
+      </div>
+    </button>
+    {% endfor %}
+  </div>
+</div>
+{% elif ruc %}
+<div class="mt-2 text-muted small">
+  <i class="bi bi-info-circle me-1"></i>No hay facturas aprobadas para este RUC en el sistema.
+</div>
+{% endif %}

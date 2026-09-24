@@ -54,7 +54,7 @@
   </div>
   <div class="card-body">
     <div class="row g-3">
-      <div class="col-md-6">
+      <div class="col-md-4">
         <label class="form-label">Motivo <span class="text-danger">*</span></label>
         <select id="motivo" class="form-select">
           <option value="1">1 — Devolución y Ajuste de precios</option>
@@ -67,13 +67,7 @@
           <option value="8" selected>8 — Otros</option>
         </select>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">CDC Factura Original <span class="text-danger">*</span></label>
-        <input type="text" id="cdc-ref" class="form-control font-monospace"
-               placeholder="CDC de 44 dígitos" maxlength="44" required>
-        <div class="form-text">Factura electrónica que se está acreditando.</div>
-      </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         <label class="form-label">Formato doc. referenciado</label>
         <select id="formato-ref" class="form-select">
           <option value="1" selected>Electrónico</option>
@@ -81,9 +75,28 @@
           <option value="3">Constancia Electrónica</option>
         </select>
       </div>
-      <div class="col-md-3">
-        <label class="form-label">N° Factura Original</label>
-        <input type="number" id="numero-ref" class="form-control" placeholder="Número correlativo">
+    </div>
+
+    <!-- Selector de factura por RUC -->
+    <div id="selector-facturas-wrap" class="mt-3 d-none">
+      <div id="selector-facturas"></div>
+    </div>
+
+    <!-- CDC y resumen de factura seleccionada -->
+    <div class="row g-3 mt-1">
+      <div class="col-12">
+        <label class="form-label fw-semibold">CDC Factura Original <span class="text-danger">*</span></label>
+        <input type="text" id="cdc-ref" class="form-control font-monospace"
+               placeholder="Seleccioná una factura arriba o pegá el CDC manualmente (44 dígitos)"
+               maxlength="44">
+        <div id="factura-seleccionada" class="mt-1 d-none">
+          <span class="badge bg-success fs-6">
+            <i class="bi bi-check-circle me-1"></i>
+            <span id="factura-sel-nro"></span> &nbsp;·&nbsp;
+            <span id="factura-sel-monto"></span> &nbsp;·&nbsp;
+            <span id="factura-sel-fecha"></span>
+          </span>
+        </div>
       </div>
     </div>
   </div>
@@ -167,7 +180,24 @@
 <script>
   addItem(true);
 
-  // Autocomplete de clientes
+  // Buscar facturas aprobadas cuando cambia el RUC
+  function buscarFacturasPorRuc(ruc) {
+    if (!ruc || ruc.length < 3) {
+      document.getElementById('selector-facturas-wrap').classList.add('d-none');
+      return;
+    }
+    htmx.ajax('GET', `/facturas/aprobadas-por-ruc?ruc=${encodeURIComponent(ruc)}`, {
+      target: '#selector-facturas',
+      swap: 'innerHTML',
+    });
+    document.getElementById('selector-facturas-wrap').classList.remove('d-none');
+  }
+
+  document.getElementById('ruc').addEventListener('change', function() {
+    buscarFacturasPorRuc(this.value.trim());
+  });
+
+  // Autocomplete de clientes — al seleccionar también busca facturas
   document.addEventListener('click', function(e) {
     const item = e.target.closest('.cliente-resultado');
     if (item) {
@@ -178,9 +208,35 @@
       document.getElementById('email').value        = item.dataset.email;
       document.getElementById('buscar-cliente').value = '';
       document.getElementById('resultados-cliente').innerHTML = '';
+      buscarFacturasPorRuc(item.dataset.ruc);
+      return;
     }
+
+    // Selección de factura referenciada
+    const factura = e.target.closest('.factura-ref-item');
+    if (factura) {
+      document.getElementById('cdc-ref').value = factura.dataset.cdc;
+      // Mostrar resumen
+      document.getElementById('factura-sel-nro').textContent   = factura.dataset.nro;
+      document.getElementById('factura-sel-monto').textContent = 'Gs. ' + Number(factura.dataset.monto).toLocaleString('es-PY');
+      document.getElementById('factura-sel-fecha').textContent = factura.dataset.fecha;
+      document.getElementById('factura-seleccionada').classList.remove('d-none');
+      // Marcar seleccionada visualmente
+      document.querySelectorAll('.factura-ref-item').forEach(b => b.classList.remove('active'));
+      factura.classList.add('active');
+      return;
+    }
+
     if (!e.target.closest('#buscar-cliente') && !e.target.closest('#resultados-cliente')) {
       document.getElementById('resultados-cliente').innerHTML = '';
+    }
+  });
+
+  // Limpiar resumen si se edita el CDC manualmente
+  document.getElementById('cdc-ref').addEventListener('input', function() {
+    if (this.value.length !== 44) {
+      document.getElementById('factura-seleccionada').classList.add('d-none');
+      document.querySelectorAll('.factura-ref-item').forEach(b => b.classList.remove('active'));
     }
   });
 

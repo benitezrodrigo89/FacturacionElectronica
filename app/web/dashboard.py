@@ -23,6 +23,23 @@ async def index(request: Request):
     return templates.TemplateResponse(request, 'dashboard.html', {'api_key': api_key})
 
 
+@router.get('/facturas/aprobadas-por-ruc', response_class=HTMLResponse)
+async def facturas_aprobadas_por_ruc(request: Request, ruc: str = ''):
+    """Fragmento HTMX: lista de FE aprobadas de un receptor para seleccionar en NCE."""
+    facturas = []
+    if ruc.strip():
+        try:
+            db = Conexion()
+            db.conectar()
+            repo = RepositorioDE(db)
+            facturas = _rows(repo.listar_aprobadas_por_ruc(ruc.strip()))
+            db.cerrar()
+        except Exception:
+            pass
+    return templates.TemplateResponse(request, '_facturas_selector.html',
+                                      {'facturas': facturas, 'ruc': ruc})
+
+
 @router.get('/documentos-tabla', response_class=HTMLResponse)
 async def tabla_documentos(
     request: Request,

@@ -248,6 +248,22 @@ class RepositorioDE:
             )
             return cur.fetchone()
 
+    def listar_aprobadas_por_ruc(self, ruc: str) -> list:
+        """Devuelve las FE aprobadas de un receptor para seleccionar en NCE/NDE."""
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT cdc, numero_doc, establecimiento, punto_expedicion,
+                       monto_total, fecha_emision
+                FROM documentos_electronicos
+                WHERE ruc_receptor = %s
+                  AND tipo_documento = 1
+                  AND estado = 'aprobado'
+                ORDER BY fecha_emision DESC
+                LIMIT 50
+            """, (ruc,))
+            return cur.fetchall()
+
     def obtener_docs_referenciados_por(self, cdc: str) -> list:
         """Devuelve NCE/NDE/NRE que referencian el CDC indicado (para mostrar en la FE)."""
         conn = self.db.conectar()
