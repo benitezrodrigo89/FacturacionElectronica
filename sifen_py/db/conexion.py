@@ -65,27 +65,39 @@ class Conexion:
         with open(schema_path, 'r', encoding='utf-8') as f:
             sql = f.read()
 
-        # Dividir en sentencias individuales respetando bloques DO $$...$$
-        import re
-        # Extraer bloques DO $$ ... $$ como una sola sentencia
-        bloques = re.split(r'(DO\s+\$\$.*?\$\$\s*;)', sql, flags=re.DOTALL | re.IGNORECASE)
-        sentencias = []
-        for bloque in bloques:
-            if re.match(r'DO\s+\$\$', bloque, re.IGNORECASE):
-                sentencias.append(bloque.strip())
-            else:
-                for s in bloque.split(';'):
-                    s = s.strip()
-                    if s:
-                        sentencias.append(s + ';')
-
         conn = self.conectar()
         with conn.cursor() as cur:
-            for sentencia in sentencias:
-                if sentencia.strip(';').strip():
-                    cur.execute(sentencia)
+            for sentencia in self._split_sql(sentencias=sql):
+                cur.execute(sentencia)
         conn.commit()
         logger.info("Schema aplicado correctamente")
+
+    @staticmethod
+    def _split_sql(sentencias: str) -> list:
+        """Divide SQL en sentencias respetando bloques $$ (funciones, DO blocks)."""
+        result = []
+        current = []
+        in_dollar = False
+        i = 0
+        while i < len(sentencias):
+            if sentencias[i:i+2] == '$$':
+                in_dollar = not in_dollar
+                current.append('$$')
+                i += 2
+            elif sentencias[i] == ';' and not in_dollar:
+                stmt = ''.join(current).strip()
+                if stmt:
+                    result.append(stmt + ';')
+                current = []
+                i += 1
+            else:
+                current.append(sentencias[i])
+                i += 1
+        # última sentencia sin punto y coma final
+        stmt = ''.join(current).strip()
+        if stmt:
+            result.append(stmt)
+        return [s for s in result if s.strip().rstrip(';').strip()]
 
     def crear_base_si_no_existe(self):
         """Crea la base de datos sifen_py si no existe (conecta a 'postgres' primero)."""
