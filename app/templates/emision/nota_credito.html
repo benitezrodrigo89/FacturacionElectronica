@@ -13,6 +13,15 @@
     <i class="bi bi-person me-1"></i>Datos del Receptor
   </div>
   <div class="card-body">
+    <div class="mb-3 position-relative">
+      <label class="form-label text-muted small">Buscar cliente guardado</label>
+      <input type="text" id="buscar-cliente" class="form-control form-control-sm"
+             placeholder="Escribí razón social o RUC…"
+             hx-get="/clientes/buscar" hx-trigger="keyup changed delay:300ms"
+             hx-target="#resultados-cliente" name="q_cliente" autocomplete="off">
+      <div id="resultados-cliente" class="list-group shadow-sm position-absolute w-100"
+           style="z-index:1000; top:100%"></div>
+    </div>
     <div class="row g-3">
       <div class="col-md-4">
         <label class="form-label">RUC <span class="text-danger">*</span></label>
@@ -59,12 +68,20 @@
         </select>
       </div>
       <div class="col-md-6">
-        <label class="form-label">CDC Factura Original</label>
+        <label class="form-label">CDC Factura Original <span class="text-danger">*</span></label>
         <input type="text" id="cdc-ref" class="form-control font-monospace"
-               placeholder="CDC de 44 dígitos (opcional)" maxlength="44">
-        <div class="form-text">Factura que se está acreditando.</div>
+               placeholder="CDC de 44 dígitos" maxlength="44" required>
+        <div class="form-text">Factura electrónica que se está acreditando.</div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
+        <label class="form-label">Formato doc. referenciado</label>
+        <select id="formato-ref" class="form-select">
+          <option value="1" selected>Electrónico</option>
+          <option value="2">Impreso</option>
+          <option value="3">Constancia Electrónica</option>
+        </select>
+      </div>
+      <div class="col-md-3">
         <label class="form-label">N° Factura Original</label>
         <input type="number" id="numero-ref" class="form-control" placeholder="Número correlativo">
       </div>
@@ -150,15 +167,38 @@
 <script>
   addItem(true);
 
+  // Autocomplete de clientes
+  document.addEventListener('click', function(e) {
+    const item = e.target.closest('.cliente-resultado');
+    if (item) {
+      document.getElementById('ruc').value          = item.dataset.ruc;
+      document.getElementById('razon_social').value = item.dataset.razon;
+      document.getElementById('direccion').value    = item.dataset.direccion;
+      document.getElementById('telefono').value     = item.dataset.telefono;
+      document.getElementById('email').value        = item.dataset.email;
+      document.getElementById('buscar-cliente').value = '';
+      document.getElementById('resultados-cliente').innerHTML = '';
+    }
+    if (!e.target.closest('#buscar-cliente') && !e.target.closest('#resultados-cliente')) {
+      document.getElementById('resultados-cliente').innerHTML = '';
+    }
+  });
+
   function submitNCE() {
     const items = getItems(true);
     if (!items.length) { alert('Agregá al menos un ítem.'); return; }
     if (!document.getElementById('ruc').value.trim()) { alert('El RUC del receptor es obligatorio.'); return; }
     if (!document.getElementById('razon_social').value.trim()) { alert('La razón social es obligatoria.'); return; }
 
-    const total   = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
-    const cdcRef  = document.getElementById('cdc-ref').value.trim();
-    const numRef  = parseInt(document.getElementById('numero-ref').value) || null;
+    const cdcRef = document.getElementById('cdc-ref').value.trim();
+    if (cdcRef.length !== 44) {
+      alert('El CDC de la factura original debe tener exactamente 44 dígitos.');
+      document.getElementById('cdc-ref').focus();
+      return;
+    }
+
+    const total  = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+    const numRef = parseInt(document.getElementById('numero-ref').value) || null;
 
     const payload = {
       receptor: {
@@ -175,11 +215,12 @@
         forma_pago: parseInt(document.getElementById('forma-pago').value),
         monto:      total,
       },
+      documento_referencia: {
+        cdc:    cdcRef,
+        formato: parseInt(document.getElementById('formato-ref').value),
+        numero: numRef,
+      },
     };
-
-    if (cdcRef.length === 44) {
-      payload.documento_referencia = { cdc: cdcRef, numero: numRef };
-    }
 
     enviarAPI('/api/v1/notas-credito', payload);
   }
