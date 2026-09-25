@@ -412,7 +412,7 @@ class TestParsearRespuestaConsultaDeXml:
         b'<dFecProc>2026-01-15T10:30:00</dFecProc>'
         b'<dCodRes>0422</dCodRes>'
         b'<dMsgRes>CDC encontrado</dMsgRes>'
-        b'<xContenDE><rContDe><dProtAut>50017901</dProtAut></rContDe></xContenDE>'
+        b'<xContenDE><![CDATA[<rContDe><dProtAut>50017901</dProtAut></rContDe>]]></xContenDE>'
         b'</rResEnviConsDe>'
         b'</env:Body>'
         b'</env:Envelope>'
