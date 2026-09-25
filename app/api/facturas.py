@@ -28,6 +28,33 @@ _DESC_PRUEBA = (
 )
 
 
+def _build_condicion(condicion_pago, monto_pago: int) -> dict:
+    condicion = {
+        "tipo": condicion_pago.tipo,
+        "entregas": [{
+            "tipo": int(condicion_pago.forma_pago),
+            "monto": str(monto_pago),
+            "moneda": "PYG",
+            "monedaDescripcion": "Guarani",
+            "cambio": 0.0,
+        }],
+    }
+    if condicion_pago.tipo == 2 and condicion_pago.credito:
+        c = condicion_pago.credito
+        credito: dict = {"tipo": c.tipo}
+        if c.plazo:
+            credito["plazo"] = c.plazo
+        if c.cuotas is not None:
+            credito["cuotas"] = c.cuotas
+        if c.info_cuotas:
+            credito["info_cuotas"] = [
+                {"moneda": q.moneda, "monto": q.monto, "vencimiento": q.vencimiento}
+                for q in c.info_cuotas
+            ]
+        condicion["credito"] = credito
+    return condicion
+
+
 def _build_data(req: FacturaRequest, numero_doc: int, cfg: dict) -> dict:
     total = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
     monto_pago = req.condicion_pago.monto or total
@@ -77,16 +104,7 @@ def _build_data(req: FacturaRequest, numero_doc: int, cfg: dict) -> dict:
             "cargo": "Cliente",
         },
         "factura": {"presencia": 1},
-        "condicion": {
-            "tipo": req.condicion_pago.tipo,
-            "entregas": [{
-                "tipo": int(req.condicion_pago.forma_pago),
-                "monto": str(monto_pago),
-                "moneda": "PYG",
-                "monedaDescripcion": "Guarani",
-                "cambio": 0.0,
-            }],
-        },
+        "condicion": _build_condicion(req.condicion_pago, monto_pago),
         "items": [
             {
                 "codigo": item.codigo or str(i + 1).zfill(3),

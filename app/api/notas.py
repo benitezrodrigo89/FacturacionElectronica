@@ -13,6 +13,7 @@ from sifen_py.db.conexion import Conexion
 from sifen_py.db.repositorio import RepositorioDE
 
 from app.config_manager import get_sifen_config, load_config
+from app.api.facturas import _build_condicion
 from app.api.auth import require_api_key
 from app.api.schemas import NotaCreditoRequest, NotaRemisionRequest, FacturaResponse
 
@@ -86,16 +87,7 @@ def _build_data_nce(req: NotaCreditoRequest, numero_doc: int, cfg: dict) -> dict
             "nombre": req.receptor.razon_social,
             "cargo": "Cliente",
         },
-        "condicion": {
-            "tipo": req.condicion_pago.tipo,
-            "entregas": [{
-                "tipo": int(req.condicion_pago.forma_pago),
-                "monto": str(monto_pago),
-                "moneda": "PYG",
-                "monedaDescripcion": "Guarani",
-                "cambio": 0.0,
-            }],
-        },
+        "condicion": _build_condicion(req.condicion_pago, monto_pago),
         "items": [
             {
                 "codigo": item.codigo or str(i + 1).zfill(3),

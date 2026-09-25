@@ -40,10 +40,24 @@ class ReceptorRequest(BaseModel):
     telefono: Optional[str] = None
 
 
+class CuotaRequest(BaseModel):
+    moneda: str = Field(default="PYG", description="Código de moneda, ej: PYG")
+    monto: int = Field(gt=0, description="Monto de la cuota en la moneda indicada")
+    vencimiento: str = Field(description="Fecha de vencimiento, formato YYYY-MM-DD")
+
+
+class CreditoRequest(BaseModel):
+    tipo: int = Field(description="1=Plazo, 2=Cuota")
+    plazo: Optional[str] = Field(default=None, description="Descripción del plazo — requerido cuando tipo=1, ej: '30 días'")
+    cuotas: Optional[int] = Field(default=None, description="Cantidad de cuotas — requerido cuando tipo=2")
+    info_cuotas: Optional[List[CuotaRequest]] = Field(default=None, description="Detalle de cuotas — opcional cuando tipo=2")
+
+
 class CondicionPagoRequest(BaseModel):
     tipo: int = Field(default=1, description="1=Contado, 2=Crédito")
     forma_pago: FormaPago = FormaPago.EFECTIVO
-    monto: Optional[int] = Field(default=None, description="Monto. Si se omite se calcula del total de ítems.")
+    monto: Optional[int] = Field(default=None, description="Monto anticipo/entrega. Si se omite se calcula del total de ítems.")
+    credito: Optional[CreditoRequest] = Field(default=None, description="Detalle del crédito — requerido cuando tipo=2")
 
 
 class FacturaRequest(BaseModel):
