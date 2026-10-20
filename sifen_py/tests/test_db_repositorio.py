@@ -310,3 +310,38 @@ class TestResumenEstados:
         repo = RepositorioDE(db)
         resumen = repo.resumen_estados()
         assert resumen == {}
+
+
+# ─── obtener_por_numero_doc ───────────────────────────────────────────────────
+
+class TestObtenerPorNumeroDoc:
+    def test_retorna_fetchone(self, mock_db):
+        db, conn, cur = mock_db
+        fila = {'id': 1, 'cdc': 'A' * 44, 'numero_doc': 42, 'estado': 'aprobado'}
+        cur.fetchone.return_value = fila
+        repo = RepositorioDE(db)
+        result = repo.obtener_por_numero_doc(42)
+        assert result == fila
+
+    def test_retorna_none_si_no_existe(self, mock_db):
+        db, conn, cur = mock_db
+        cur.fetchone.return_value = None
+        repo = RepositorioDE(db)
+        result = repo.obtener_por_numero_doc(999)
+        assert result is None
+
+    def test_pasa_numero_y_tipo_al_query(self, mock_db):
+        db, conn, cur = mock_db
+        cur.fetchone.return_value = None
+        repo = RepositorioDE(db)
+        repo.obtener_por_numero_doc(7, tipo_documento=5)
+        args = cur.execute.call_args[0][1]
+        assert args == (7, 5)
+
+    def test_tipo_documento_default_es_1(self, mock_db):
+        db, conn, cur = mock_db
+        cur.fetchone.return_value = None
+        repo = RepositorioDE(db)
+        repo.obtener_por_numero_doc(3)
+        args = cur.execute.call_args[0][1]
+        assert args[1] == 1
