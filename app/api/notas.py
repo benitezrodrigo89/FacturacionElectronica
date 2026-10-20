@@ -165,6 +165,35 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
                         f"No se puede emitir una NCE sobre un documento {estado_ref}."
                     ),
                 )
+        else:
+            # No está en BD local → consultar directamente a SIFEN
+            try:
+                client_consulta = SifenSOAPClient(sifen_config)
+                resp_consulta   = client_consulta.consultar_de_directo(ref_cdc)
+            except Exception as e:
+                db.cerrar()
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"No se pudo verificar el documento referenciado en SIFEN: {e}",
+                )
+            if resp_consulta.codigo != '0422':
+                db.cerrar()
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"El documento referenciado (CDC: {ref_cdc}) no está aprobado en SIFEN "
+                        f"— código: {resp_consulta.codigo}, {resp_consulta.descripcion}."
+                    ),
+                )
+            if resp_consulta.raw.get('cancelado'):
+                db.cerrar()
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"El documento referenciado (CDC: {ref_cdc}) está cancelado en SIFEN. "
+                        f"No se puede emitir una NCE sobre un documento cancelado."
+                    ),
+                )
 
     # 2. Generar XML
     data = _build_data_nce(req, numero_doc, cfg)

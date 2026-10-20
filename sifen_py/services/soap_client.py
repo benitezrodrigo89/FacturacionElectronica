@@ -785,17 +785,23 @@ class SifenSOAPClient:
                         xml_de = m_de.group(1)
 
                     # Detectar eventos (xContEv con contenido)
+                    # rGeVeCan → cancelación (tipo 1)
+                    # rGeVeInu → inutilización (tipo 2)
                     m_ev = _re.findall(r'<xContEv>(.*?)</xContEv>', cdata_str, _re.DOTALL)
                     for ev_str in m_ev:
-                        if ev_str.strip():
-                            eventos.append({'xml': ev_str.strip()})
+                        if not ev_str.strip():
+                            continue
+                        if 'rGeVeCan' in ev_str:
+                            tipo = 'cancelacion'
+                        elif 'rGeVeInu' in ev_str:
+                            tipo = 'inutilizacion'
+                        else:
+                            tipo = 'otro'
+                        eventos.append({'xml': ev_str.strip(), 'tipo': tipo})
 
             # Determinar estado real considerando eventos
             estado_real = 'Aprobado' if codigo == '0422' else ''
-            cancelado = any(
-                e.get('tipo') in ('1', 'cancelacion', 'cancel') or 'cancel' in e.get('mensaje','').lower()
-                for e in eventos
-            )
+            cancelado = any(e.get('tipo') == 'cancelacion' for e in eventos)
             if cancelado:
                 estado_real = 'Cancelado'
 

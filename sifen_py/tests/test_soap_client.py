@@ -548,6 +548,69 @@ class TestConsultarDeDirecto:
             with pytest.raises(SOAPException, match='Error HTTP'):
                 client.consultar_de_directo(cdc_valido)
 
+    def test_codigo_0420_cuando_de_no_existe(self, client, cdc_valido):
+        # SIFEN devuelve 0420 cuando el CDC no existe o fue rechazado
+        mock_session = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = (
+            b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            b'<env:Body>'
+            b'<rRetConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            b'<rProtDe><dCodRes>0420</dCodRes><dMsgRes>DE no encontrado</dMsgRes></rProtDe>'
+            b'</rRetConsDE></env:Body></env:Envelope>'
+        )
+        mock_resp.content = mock_resp.content
+        mock_session.post.return_value = mock_resp
+        with patch.object(client, '_get_session', return_value=mock_session):
+            r = client.consultar_de_directo(cdc_valido)
+        assert r.codigo == '0420'
+        assert r.raw.get('cancelado') is False
+
+    def _xml_consulta(self, cdata: str, codigo: str = '0422', desc: str = 'Aprobado') -> bytes:
+        return (
+            b'<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
+            b'<env:Body>'
+            b'<rRetConsDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
+            b'<rProtDe>'
+            + f'<dCodRes>{codigo}</dCodRes><dMsgRes>{desc}</dMsgRes>'.encode()
+            + (b'<xContenDE><![CDATA[' + cdata.encode() + b']]></xContenDE>' if cdata else b'')
+            + b'</rProtDe>'
+            b'</rRetConsDE></env:Body></env:Envelope>'
+        )
+
+    def _mock_resp(self, xml: bytes):
+        mock_session = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = xml
+        mock_session.post.return_value = mock_resp
+        return mock_session
+
+    def test_aprobado_sin_eventos_no_esta_cancelado(self, client, cdc_valido):
+        xml = self._xml_consulta('<rDE><dDVId>1</dDVId></rDE><dProtAut>50017901</dProtAut>')
+        with patch.object(client, '_get_session', return_value=self._mock_resp(xml)):
+            r = client.consultar_de_directo(cdc_valido)
+        assert r.codigo == '0422'
+        assert r.raw.get('protocolo') == '50017901'
+        assert r.raw.get('cancelado') is False
+
+    def test_aprobado_con_evento_cancelacion_devuelve_cancelado_true(self, client, cdc_valido):
+        cdata = (
+            '<rDE><dDVId>1</dDVId></rDE>'
+            '<dProtAut>50017901</dProtAut>'
+            '<xContEv><rGesEve><rEve Id="1"><gGroupTiEvt>'
+            f'<rGeVeCan Id="{cdc_valido}"><mOtEve>Error en factura</mOtEve></rGeVeCan>'
+            '</gGroupTiEvt></rEve></rGesEve></xContEv>'
+        )
+        xml = self._xml_consulta(cdata)
+        with patch.object(client, '_get_session', return_value=self._mock_resp(xml)):
+            r = client.consultar_de_directo(cdc_valido)
+        assert r.codigo == '0422'
+        assert r.raw.get('cancelado') is True
+        assert r.raw.get('estado') == 'Cancelado'
+        assert r.raw['eventos'][0]['tipo'] == 'cancelacion'
+
 
 # ─── consultar_ruc_directo ────────────────────────────────────────────────────
 
