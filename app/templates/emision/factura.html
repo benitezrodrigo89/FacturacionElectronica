@@ -285,9 +285,16 @@
     validarEntregas();
   }
 
-  // Agregar una fila inicial
+  // Agregar filas iniciales
   addItem(true);
   addEntrega(1);
+
+  // Escuchar cambios en precio/cantidad de ítems para actualizar el monto de entrega
+  document.getElementById('items-body').addEventListener('input', function(e) {
+    if (e.target.classList.contains('item-price') || e.target.classList.contains('item-qty')) {
+      syncMontoEntrega();
+    }
+  });
 
   function toggleCredito() {
     const esCredito = document.getElementById('tipo-pago').value === '2';
