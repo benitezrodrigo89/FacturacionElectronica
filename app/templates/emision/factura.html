@@ -211,7 +211,27 @@
     ).join('');
   }
 
+  // Lee el total de ítems directamente del DOM (igual que updateTotal en emision.js)
+  function _totalItems() {
+    let total = 0;
+    document.querySelectorAll('.item-row').forEach(row => {
+      total += (parseFloat(row.querySelector('.item-qty')?.value) || 0)
+             * (parseInt(row.querySelector('.item-price')?.value) || 0);
+    });
+    return total;
+  }
+
+  function _sumaEntregas() {
+    return Array.from(document.getElementById('entregas-body').querySelectorAll('.entrega-monto'))
+                .reduce((s, el) => s + (parseInt(el.value) || 0), 0);
+  }
+
   function addEntrega(formaPago = 1, monto = '') {
+    // Si no se pasa monto, sugerir el monto restante (total - lo ya asignado)
+    if (monto === '') {
+      const restante = _totalItems() - _sumaEntregas();
+      monto = restante > 0 ? restante : '';
+    }
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><select class="form-select form-select-sm entrega-forma">${_selectFormas(formaPago)}</select></td>
@@ -226,20 +246,18 @@
 
   function removeEntrega(btn) {
     const filas = document.getElementById('entregas-body').querySelectorAll('tr');
-    if (filas.length <= 1) return; // siempre al menos una
+    if (filas.length <= 1) return;
     btn.closest('tr').remove();
     validarEntregas();
   }
 
   function validarEntregas() {
-    const total = getItems(false).reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
-    const sumaEntregas = Array.from(
-      document.getElementById('entregas-body').querySelectorAll('.entrega-monto')
-    ).reduce((s, el) => s + (parseInt(el.value) || 0), 0);
-    const aviso = document.getElementById('entregas-aviso');
-    const filas = document.getElementById('entregas-body').querySelectorAll('tr');
-    // Solo avisar si hay más de una forma de pago
-    aviso.style.display = (filas.length > 1 && sumaEntregas !== total) ? '' : 'none';
+    const total        = _totalItems();
+    const suma         = _sumaEntregas();
+    const filas        = document.getElementById('entregas-body').querySelectorAll('tr');
+    const aviso        = document.getElementById('entregas-aviso');
+    // Mostrar aviso solo con múltiples formas y suma incorrecta
+    aviso.style.display = (filas.length > 1 && total > 0 && suma !== total) ? '' : 'none';
   }
 
   function buildEntregas() {
@@ -261,7 +279,7 @@
   function syncMontoEntrega() {
     const filas = document.getElementById('entregas-body').querySelectorAll('tr');
     if (filas.length === 1) {
-      const total = getItems(false).reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+      const total = _totalItems();
       filas[0].querySelector('.entrega-monto').value = total || '';
     }
     validarEntregas();
