@@ -53,10 +53,19 @@ class CreditoRequest(BaseModel):
     info_cuotas: Optional[List[CuotaRequest]] = Field(default=None, description="Detalle de cuotas — opcional cuando tipo=2")
 
 
+class EntregaRequest(BaseModel):
+    forma_pago: FormaPago = Field(description="Forma de pago de esta entrega")
+    monto: int = Field(gt=0, description="Monto de esta entrega en guaraníes")
+
+
 class CondicionPagoRequest(BaseModel):
     tipo: int = Field(default=1, description="1=Contado, 2=Crédito")
-    forma_pago: FormaPago = FormaPago.EFECTIVO
-    monto: Optional[int] = Field(default=None, description="Monto anticipo/entrega. Si se omite se calcula del total de ítems.")
+    forma_pago: FormaPago = Field(default=FormaPago.EFECTIVO, description="Forma de pago principal (ignorado si se usa 'entregas')")
+    monto: Optional[int] = Field(default=None, description="Monto total de la entrega. Si se omite se calcula del total de ítems. Ignorado si se usa 'entregas'.")
+    entregas: Optional[List[EntregaRequest]] = Field(
+        default=None,
+        description="Lista de formas de pago con sus montos. Usar cuando el pago es mixto (ej: parte efectivo, parte transferencia). Si se especifica, reemplaza 'forma_pago' y 'monto'.",
+    )
     credito: Optional[CreditoRequest] = Field(default=None, description="Detalle del crédito — requerido cuando tipo=2")
 
 

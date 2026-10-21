@@ -29,15 +29,29 @@ _DESC_PRUEBA = (
 
 
 def _build_condicion(condicion_pago, monto_pago: int) -> dict:
-    condicion = {
-        "tipo": condicion_pago.tipo,
-        "entregas": [{
+    if condicion_pago.entregas:
+        entregas_list = [
+            {
+                "tipo": int(e.forma_pago),
+                "monto": str(e.monto),
+                "moneda": "PYG",
+                "monedaDescripcion": "Guarani",
+                "cambio": 0.0,
+            }
+            for e in condicion_pago.entregas
+        ]
+    else:
+        entregas_list = [{
             "tipo": int(condicion_pago.forma_pago),
             "monto": str(monto_pago),
             "moneda": "PYG",
             "monedaDescripcion": "Guarani",
             "cambio": 0.0,
-        }],
+        }]
+
+    condicion = {
+        "tipo": condicion_pago.tipo,
+        "entregas": entregas_list,
     }
     if condicion_pago.tipo == 2 and condicion_pago.credito:
         c = condicion_pago.credito
