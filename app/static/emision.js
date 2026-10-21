@@ -60,6 +60,8 @@ function updateTotal() {
   });
   const t = document.getElementById('total-general');
   if (t) t.textContent = fmtGs(total);
+  // Sincronizar monto en el panel de formas de pago si existe (factura.html)
+  if (typeof syncMontoEntrega === 'function') syncMontoEntrega();
 }
 
 function getItems(withPrice = true) {

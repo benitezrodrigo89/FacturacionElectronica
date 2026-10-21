@@ -92,7 +92,7 @@
     <i class="bi bi-credit-card me-1"></i>Condición de Pago
   </div>
   <div class="card-body">
-    <div class="row g-3">
+    <div class="row g-3 mb-3">
       <div class="col-md-4">
         <label class="form-label">Tipo</label>
         <select id="tipo-pago" class="form-select" onchange="toggleCredito()">
@@ -100,22 +100,33 @@
           <option value="2">Crédito</option>
         </select>
       </div>
-      <div class="col-md-4">
-        <label class="form-label">Forma de pago</label>
-        <select id="forma-pago" class="form-select">
-          <option value="1">Efectivo</option>
-          <option value="2">Cheque</option>
-          <option value="3">Tarjeta de Crédito</option>
-          <option value="4">Tarjeta de Débito</option>
-          <option value="5">Transferencia</option>
-          <option value="7">Billetera Electrónica</option>
-          <option value="99">Otro</option>
-        </select>
-      </div>
-      <div class="col-md-4">
+      <div class="col-md-8">
         <label class="form-label">Descripción (opcional)</label>
         <input type="text" id="descripcion" class="form-control" placeholder="Venta de mercaderías">
       </div>
+    </div>
+
+    <!-- Formas de pago (permite múltiples) -->
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <label class="form-label mb-0 fw-semibold">Formas de pago</label>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addEntrega()">
+        <i class="bi bi-plus-circle me-1"></i>Agregar forma de pago
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle mb-1">
+        <thead class="table-light">
+          <tr>
+            <th>Forma de pago</th>
+            <th style="width:200px">Monto (Gs.) <span class="text-danger">*</span></th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="entregas-body"></tbody>
+      </table>
+    </div>
+    <div id="entregas-aviso" class="text-danger small" style="display:none">
+      La suma de las formas de pago no coincide con el total de la factura.
     </div>
 
     <!-- Panel crédito — solo visible cuando tipo=2 -->
@@ -188,8 +199,77 @@
     }
   });
 
+  const FORMAS_PAGO = [
+    [1,'Efectivo'],[2,'Cheque'],[3,'Tarjeta de Crédito'],[4,'Tarjeta de Débito'],
+    [5,'Transferencia'],[6,'Giro'],[7,'Billetera Electrónica'],[8,'Tarjeta Empresarial'],
+    [9,'Vale'],[99,'Otro'],
+  ];
+
+  function _selectFormas(selected) {
+    return FORMAS_PAGO.map(([v,l]) =>
+      `<option value="${v}" ${v == selected ? 'selected' : ''}>${l}</option>`
+    ).join('');
+  }
+
+  function addEntrega(formaPago = 1, monto = '') {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><select class="form-select form-select-sm entrega-forma">${_selectFormas(formaPago)}</select></td>
+      <td><input type="number" class="form-control form-control-sm entrega-monto" min="1" value="${monto}" oninput="validarEntregas()"></td>
+      <td class="text-center">
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeEntrega(this)">
+          <i class="bi bi-trash"></i>
+        </button>
+      </td>`;
+    document.getElementById('entregas-body').appendChild(tr);
+  }
+
+  function removeEntrega(btn) {
+    const filas = document.getElementById('entregas-body').querySelectorAll('tr');
+    if (filas.length <= 1) return; // siempre al menos una
+    btn.closest('tr').remove();
+    validarEntregas();
+  }
+
+  function validarEntregas() {
+    const total = getItems(false).reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+    const sumaEntregas = Array.from(
+      document.getElementById('entregas-body').querySelectorAll('.entrega-monto')
+    ).reduce((s, el) => s + (parseInt(el.value) || 0), 0);
+    const aviso = document.getElementById('entregas-aviso');
+    const filas = document.getElementById('entregas-body').querySelectorAll('tr');
+    // Solo avisar si hay más de una forma de pago
+    aviso.style.display = (filas.length > 1 && sumaEntregas !== total) ? '' : 'none';
+  }
+
+  function buildEntregas() {
+    const filas = document.getElementById('entregas-body').querySelectorAll('tr');
+    const entregas = [];
+    for (const tr of filas) {
+      const forma = parseInt(tr.querySelector('.entrega-forma').value);
+      const monto = parseInt(tr.querySelector('.entrega-monto').value);
+      if (!monto || monto <= 0) {
+        alert('El monto de cada forma de pago debe ser mayor a 0.');
+        return false;
+      }
+      entregas.push({ forma_pago: forma, monto });
+    }
+    return entregas;
+  }
+
+  // Sincronizar monto de la primera fila con el total cuando solo hay una entrega
+  function syncMontoEntrega() {
+    const filas = document.getElementById('entregas-body').querySelectorAll('tr');
+    if (filas.length === 1) {
+      const total = getItems(false).reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+      filas[0].querySelector('.entrega-monto').value = total || '';
+    }
+    validarEntregas();
+  }
+
   // Agregar una fila inicial
   addItem(true);
+  addEntrega(1);
 
   function toggleCredito() {
     const esCredito = document.getElementById('tipo-pago').value === '2';
@@ -253,14 +333,27 @@
     if (!document.getElementById('ruc').value.trim()) { alert('El RUC del receptor es obligatorio.'); return; }
     if (!document.getElementById('razon_social').value.trim()) { alert('La razón social es obligatoria.'); return; }
 
-    const credito = buildCredito();
-    if (credito === false) return; // validación falló
+    syncMontoEntrega();
 
-    const total = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+    const credito = buildCredito();
+    if (credito === false) return;
+
+    const entregas = buildEntregas();
+    if (entregas === false) return;
+
+    // Validar que la suma de entregas coincida con el total (solo si hay más de una)
+    if (entregas.length > 1) {
+      const total = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+      const suma  = entregas.reduce((s, e) => s + e.monto, 0);
+      if (suma !== total) {
+        alert(`La suma de las formas de pago (Gs. ${suma.toLocaleString()}) no coincide con el total (Gs. ${total.toLocaleString()}).`);
+        return;
+      }
+    }
+
     const condicion_pago = {
-      tipo:       parseInt(document.getElementById('tipo-pago').value),
-      forma_pago: parseInt(document.getElementById('forma-pago').value),
-      monto:      total,
+      tipo:     parseInt(document.getElementById('tipo-pago').value),
+      entregas,
     };
     if (credito) condicion_pago.credito = credito;
 
