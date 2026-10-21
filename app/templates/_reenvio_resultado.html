@@ -1,0 +1,54 @@
+{% if error_general %}
+<div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle me-1"></i>{{ error_general }}</div>
+{% else %}
+<div class="alert alert-secondary py-2 mb-0">
+  <strong>Resultado del procesamiento — {{ nombre_tipo }}</strong>
+
+  {% if resultado.aprobados %}
+  <div class="mt-2">
+    <span class="badge bg-success me-1">{{ resultado.aprobados|length }}</span>
+    ya aprobados en SIFEN — estado actualizado en BD.
+  </div>
+  {% endif %}
+
+  {% if resultado.protocolo_lote %}
+  <div class="mt-2">
+    <span class="badge bg-warning text-dark me-1">{{ resultado.en_lote|length }}</span>
+    enviados en lote.
+    Protocolo: <code>{{ resultado.protocolo_lote }}</code>
+    <br>
+    <small class="text-muted">Consultá el resultado en ≥10 minutos.</small>
+    <div class="mt-2" id="res-nuevo-lote">
+      <button class="btn btn-sm btn-outline-primary"
+              hx-post="/reenvio/consultar-lote/{{ resultado.protocolo_lote }}"
+              hx-target="#res-nuevo-lote"
+              hx-swap="outerHTML"
+              hx-indicator="#spin-nuevo-lote">
+        <span id="spin-nuevo-lote" class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
+        <i class="bi bi-search me-1"></i>Consultar resultado del lote
+      </button>
+    </div>
+  </div>
+  {% elif resultado.en_lote %}
+  <div class="mt-2 text-danger">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    {{ resultado.en_lote|length }} documento(s) para lote pero SIFEN no devolvió protocolo.
+  </div>
+  {% endif %}
+
+  {% if not resultado.aprobados and not resultado.en_lote and not resultado.errores %}
+  <div class="mt-2 text-muted">No había documentos para procesar.</div>
+  {% endif %}
+
+  {% if resultado.errores %}
+  <div class="mt-2">
+    <span class="badge bg-danger me-1">{{ resultado.errores|length }}</span> con error:
+    <ul class="mb-0 mt-1 small">
+    {% for e in resultado.errores %}
+      <li><code>{{ e.cdc[:16] if e.cdc != 'LOTE' else 'LOTE' }}…</code> — {{ e.codigo }}: {{ e.msg }}</li>
+    {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endif %}

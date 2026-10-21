@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h4 class="mb-0"><i class="bi bi-arrow-repeat me-1 text-warning"></i>Reenvío por Lote</h4>
+  <span class="text-muted small">Documentos pendientes o con error de comunicación</span>
+</div>
+
+{% if error %}
+<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}</div>
+{% endif %}
+
+{# ── Lotes enviados pendientes de resultado ─────────────────────────────── #}
+{% if lotes_pendientes %}
+<div class="card mb-4">
+  <div class="card-header bg-warning bg-opacity-10 border-warning-subtle d-flex align-items-center gap-2">
+    <i class="bi bi-hourglass-split text-warning"></i>
+    <strong>Lotes enviados — pendientes de resultado</strong>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Protocolo lote (dProtConsLote)</th>
+          <th>Tipo</th>
+          <th class="text-center">DEs</th>
+          <th>Enviado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for lote in lotes_pendientes %}
+        <tr>
+          <td><code class="cdc">{{ lote.protocolo_lote }}</code></td>
+          <td><span class="badge bg-secondary">{{ tipos_doc.get(lote.tipo_documento, lote.tipo_documento) }}</span></td>
+          <td class="text-center">{{ lote.cantidad }}</td>
+          <td class="text-muted small">{{ lote.ultima_fecha.strftime('%d/%m %H:%M') if lote.ultima_fecha else '—' }}</td>
+          <td>
+            <div id="res-lote-{{ loop.index }}">
+              <button class="btn btn-sm btn-outline-primary"
+                      hx-post="/reenvio/consultar-lote/{{ lote.protocolo_lote }}"
+                      hx-target="#res-lote-{{ loop.index }}"
+                      hx-swap="outerHTML"
+                      hx-indicator="#spin-lote-{{ loop.index }}">
+                <span id="spin-lote-{{ loop.index }}" class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
+                <i class="bi bi-search me-1"></i>Consultar resultado
+              </button>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Documentos sin lote asignado ───────────────────────────────────────── #}
+{% if resumen %}
+<div class="row g-3 mb-4">
+  {% for tipo, datos in resumen.items() %}
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>{{ datos.nombre }}</strong>
+        <div class="d-flex gap-2">
+          {% if datos.pendiente %}
+          <span class="badge bg-warning text-dark">{{ datos.pendiente }} pendiente{{ 's' if datos.pendiente != 1 }}</span>
+          {% endif %}
+          {% if datos.error %}
+          <span class="badge bg-danger">{{ datos.error }} error{{ 'es' if datos.error != 1 }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Se consultará cada documento en SIFEN. Los que no existan serán enviados en lote asíncrono.
+          Los que ya estén aprobados se actualizarán automáticamente.
+        </p>
+
+        {# Botón para ver detalle (carga la tabla vía HTMX) #}
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary"
+                  hx-get="/reenvio/docs/{{ tipo }}"
+                  hx-target="#tabla-{{ tipo }}"
+                  hx-swap="innerHTML">
+            <i class="bi bi-list-ul me-1"></i>Ver documentos
+          </button>
+
+          <button class="btn btn-sm btn-warning"
+                  hx-post="/reenvio/procesar/{{ tipo }}"
+                  hx-target="#resultado-{{ tipo }}"
+                  hx-swap="innerHTML"
+                  hx-indicator="#spin-{{ tipo }}"
+                  hx-confirm="¿Procesar {{ (datos.pendiente or 0) + (datos.error or 0) }} documento(s) de tipo {{ datos.nombre }}?">
+            <span id="spin-{{ tipo }}" class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
+            <i class="bi bi-arrow-repeat me-1"></i>Consultar y reenviar
+          </button>
+        </div>
+
+        <div id="tabla-{{ tipo }}" class="mt-3"></div>
+        <div id="resultado-{{ tipo }}" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-check-circle text-success fs-1 d-block mb-2"></i>
+    No hay documentos pendientes ni con error de comunicación.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

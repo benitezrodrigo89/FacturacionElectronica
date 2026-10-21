@@ -387,6 +387,43 @@ class RepositorioDE:
             rows = cur.fetchall()
         return {r['estado']: r['total'] for r in rows}
 
+    def obtener_para_reenvio(self, tipo_documento: int = 1, limite: int = 50) -> list:
+        """
+        Devuelve documentos en estado 'pendiente' o 'error' sin lote asignado,
+        listos para ser consultados en SIFEN y reenviados por lote si es necesario.
+        Agrupados por tipo_documento para respetar la restricción del lote.
+        """
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT cdc, xml_firmado, tipo_documento, estado, codigo_sifen
+                FROM documentos_electronicos
+                WHERE estado IN ('pendiente', 'error')
+                  AND tipo_documento = %s
+                  AND (protocolo_lote IS NULL OR protocolo_lote = '')
+                ORDER BY fecha_emision ASC
+                LIMIT %s
+            """, (tipo_documento, limite))
+            return cur.fetchall()
+
+    def marcar_en_lote(self, cdcs: list, protocolo_lote: str):
+        """
+        Asocia un conjunto de CDCs al protocolo del lote que los agrupa.
+        Se llama después de recibir el dProtConsLote de SIFEN.
+        """
+        if not cdcs:
+            return
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE documentos_electronicos SET
+                    protocolo_lote = %s,
+                    fecha_envio    = NOW()
+                WHERE cdc = ANY(%s)
+            """, (protocolo_lote, list(cdcs)))
+        conn.commit()
+        logger.info(f"CDCs asociados al lote {protocolo_lote}: {len(cdcs)}")
+
     def resumen_por_tipo(self, periodo: str = 'todo') -> dict:
         """Devuelve conteo de documentos aprobados por tipo para el período indicado."""
         filtro_fecha = self._FILTROS_PERIODO.get(periodo, '1=1')
@@ -408,11 +445,18 @@ class RepositorioDE:
 # ─────────────────────────────────────────────────────────────────────
 
 def _codigo_a_estado(codigo: str) -> str:
-    """Mapea código de respuesta de envío al estado del DE."""
-    return {
-        '0260': 'aprobado',
-        '1001': 'aprobado',  # CDC duplicado = ya existe en SIFEN = estaba aprobado
-    }.get(codigo, 'rechazado')
+    """
+    Mapea código de respuesta de envío al estado del DE.
+
+    0260 / 1001  → aprobado
+    Código SIFEN numérico (0160, 1103, etc.) → rechazado  (SIFEN procesó y rechazó)
+    ERR / vacío / desconocido               → error       (no sabemos qué tiene SIFEN)
+    """
+    if codigo in ('0260', '1001'):
+        return 'aprobado'
+    if codigo and codigo.isdigit():
+        return 'rechazado'
+    return 'error'
 
 
 def _codigo_consulta_a_estado(codigo: str) -> str:

@@ -14,6 +14,15 @@ MIGRACIONES = [
     ALTER TABLE documentos_electronicos
     ADD COLUMN IF NOT EXISTS data_json TEXT;
     """,
+    # v2: agregar protocolo_lote para envío asíncrono por lote
+    """
+    ALTER TABLE documentos_electronicos
+    ADD COLUMN IF NOT EXISTS protocolo_lote VARCHAR(50);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_de_protocolo_lote
+    ON documentos_electronicos (protocolo_lote);
+    """,
 ]
 
 def main():

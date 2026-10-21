@@ -95,6 +95,18 @@ class SifenSOAPClient:
         'prod': 'https://sifen.set.gov.py/de/ws/sync/recibe.wsdl',
     }
 
+    # Endpoints HTTP directos para envío async por lote
+    URLS_LOTE = {
+        'test': 'https://sifen-test.set.gov.py/de/ws/async/recibe-lote.wsdl',
+        'prod': 'https://sifen.set.gov.py/de/ws/async/recibe-lote.wsdl',
+    }
+
+    # Endpoints HTTP directos para consulta de estado de lote
+    URLS_CONSULTA_LOTE = {
+        'test': 'https://sifen-test.set.gov.py/de/ws/consultas/consulta-lote.wsdl',
+        'prod': 'https://sifen.set.gov.py/de/ws/consultas/consulta-lote.wsdl',
+    }
+
     # Endpoints HTTP directos para consulta por CDC
     URLS_CONSULTA_DE = {
         'test': 'https://sifen-test.set.gov.py/de/ws/consultas/consulta.wsdl',
@@ -721,6 +733,154 @@ class SifenSOAPClient:
             return RespuestaSIFEN('ERR', str(e), {'xml': xml_str})
 
     # ─────────────────────────────────────────────────────────
+    # 2b. RECEPCIÓN ASÍNCRONA DIRECTA (sin WSDL, HTTP POST puro)
+    # ─────────────────────────────────────────────────────────
+    def enviar_lote_directo(
+        self,
+        xmls_firmados: list[str],
+        id_lote: str = None,
+    ) -> 'RespuestaSIFEN':
+        """
+        Envía un lote de DEs al servicio asíncrono de SIFEN usando HTTP POST
+        directo sin zeep, construyendo el envelope manualmente.
+
+        Flujo según Guía de Mejores Prácticas:
+          1. Arma <rLoteDE> con los <rDE> firmados adentro
+          2. Comprime en ZIP
+          3. Codifica en Base64
+          4. Envía en <xDE> del envelope SOAP
+
+        Args:
+            xmls_firmados: Lista de XMLs de rDE firmados (máx 50, mismo tipo)
+            id_lote:       ID del lote (se genera automático si None)
+
+        Returns:
+            RespuestaSIFEN — raw['protocolo_lote'] contiene dProtConsLote
+            (necesario para consultar el resultado del lote después)
+        """
+        import base64
+        if not xmls_firmados:
+            raise BatchException("La lista de XMLs no puede estar vacía")
+        if len(xmls_firmados) > LIMITE_DOCS_POR_LOTE:
+            raise BatchException(
+                f"El lote excede el máximo de {LIMITE_DOCS_POR_LOTE} documentos "
+                f"(recibidos: {len(xmls_firmados)})"
+            )
+        if not id_lote:
+            id_lote = str(int(time.time()))
+
+        # 1+2. Construir <rLoteDE> y comprimir
+        rdes = ''.join(f'<rDE>{x}</rDE>' for x in xmls_firmados)
+        xml_lote = (
+            '<rLoteDE xmlns="http://ekuatia.set.gov.py/sifen/xsd"'
+            ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+            f'<dId>{id_lote}</dId>'
+            f'{rdes}'
+            '</rLoteDE>'
+        )
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f'lote_{id_lote}.xml', xml_lote.encode('utf-8'))
+        zip_bytes = buffer.getvalue()
+
+        tam_kb = len(zip_bytes) / 1024
+        if tam_kb > TAMANO_MAX_LOTE_KB:
+            raise BatchException(
+                f"El lote comprimido supera el máximo de {TAMANO_MAX_LOTE_KB} KB "
+                f"(tamaño: {tam_kb:.1f} KB)"
+            )
+
+        # 3. Base64
+        zip_b64 = base64.b64encode(zip_bytes).decode('ascii')
+
+        # 4. Envelope SOAP
+        envelope_str = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"'
+            ' xmlns:xsd="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<soap:Header/>'
+            '<soap:Body>'
+            '<xsd:rEnvioLote>'
+            f'<xsd:dId>{id_lote}</xsd:dId>'
+            f'<xsd:xDE>{zip_b64}</xsd:xDE>'
+            '</xsd:rEnvioLote>'
+            '</soap:Body>'
+            '</soap:Envelope>'
+        )
+        envelope = envelope_str.encode('utf-8')
+
+        url     = self.URLS_LOTE[self.config.ambiente]
+        session = self._get_session()
+        headers = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+
+        logger.info(
+            f"Enviando lote directo #{id_lote} — {len(xmls_firmados)} DEs, "
+            f"{tam_kb:.1f} KB comprimido → {url}"
+        )
+        try:
+            resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
+        except Exception as e:
+            raise SOAPException(f"Error HTTP al enviar lote: {e}") from e
+
+        if resp.status_code not in (200, 400, 500):
+            resp.raise_for_status()
+
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        logger.debug(f"Respuesta lote:\n{resp.content.decode('utf-8', errors='replace')}")
+        return self._parsear_respuesta_lote_xml(resp.content)
+
+    # ─────────────────────────────────────────────────────────
+    # 3b. CONSULTA DE LOTE DIRECTA (sin WSDL)
+    # ─────────────────────────────────────────────────────────
+    def consultar_lote_directo(self, protocolo_lote: str) -> 'RespuestaSIFEN':
+        """
+        Consulta el resultado de un lote enviado usando su dProtConsLote.
+
+        Códigos de respuesta (dCodResLot):
+            0360 → Lote no existe
+            0361 → En procesamiento — volver a consultar en ≥10 min
+            0362 → Procesado — raw['detalle_des'] contiene el resultado por CDC
+            0364 → Consulta extemporánea (pasaron más de 48 hs)
+
+        Args:
+            protocolo_lote: dProtConsLote devuelto por enviar_lote_directo()
+        """
+        envelope_str = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"'
+            ' xmlns:xsd="http://ekuatia.set.gov.py/sifen/xsd">'
+            '<soap:Header/>'
+            '<soap:Body>'
+            '<xsd:rEnviConsLoteDe>'
+            '<xsd:dId>1</xsd:dId>'
+            f'<xsd:dProtConsLote>{protocolo_lote}</xsd:dProtConsLote>'
+            '</xsd:rEnviConsLoteDe>'
+            '</soap:Body>'
+            '</soap:Envelope>'
+        )
+        envelope = envelope_str.encode('utf-8')
+        headers  = {
+            'Content-Type': 'application/soap+xml;charset=UTF-8',
+            'SOAPAction':   '',
+        }
+
+        url     = self.URLS_CONSULTA_LOTE[self.config.ambiente]
+        session = self._get_session()
+
+        logger.info(f"Consultando lote directo: {protocolo_lote}")
+        try:
+            resp = session.post(url, data=envelope, headers=headers, timeout=self.timeout)
+        except Exception as e:
+            raise SOAPException(f"Error HTTP al consultar lote: {e}") from e
+
+        logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
+        logger.debug(f"Respuesta consulta lote:\n{resp.content.decode('utf-8', errors='replace')}")
+        return self._parsear_respuesta_consulta_lote_xml(resp.content)
+
+    # ─────────────────────────────────────────────────────────
     # HELPERS INTERNOS
     # ─────────────────────────────────────────────────────────
     def _comprimir_xmls(self, xmls: list[str], numero_lote: str) -> bytes:
@@ -826,6 +986,77 @@ class SifenSOAPClient:
             return resp
         except Exception as e:
             logger.error(f"Error parseando respuesta consulta DE: {e}")
+            return RespuestaSIFEN('ERR', str(e), {})
+
+    def _parsear_respuesta_lote_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:
+        """Parsea la respuesta de enviar_lote_directo (rResEnviLoteDe)."""
+        try:
+            root = etree.fromstring(xml_bytes)
+            ns   = 'http://ekuatia.set.gov.py/sifen/xsd'
+
+            def _txt(tag):
+                el = root.find('.//{%s}%s' % (ns, tag))
+                return el.text.strip() if el is not None and el.text else ''
+
+            codigo         = _txt('dCodRes')
+            desc           = _txt('dMsgRes')
+            protocolo_lote = _txt('dProtConsLote')
+
+            if not codigo:
+                fault = root.find('.//{http://www.w3.org/2003/05/soap-envelope}Fault')
+                if fault is not None:
+                    txt = fault.find('.//{http://www.w3.org/2003/05/soap-envelope}Text')
+                    return RespuestaSIFEN('ERR', txt.text if txt is not None else 'SOAP Fault', {})
+
+            raw = {
+                'xml':            xml_bytes.decode('utf-8', errors='replace'),
+                'protocolo_lote': protocolo_lote,
+            }
+            resp = RespuestaSIFEN(codigo or 'ERR', desc or 'Sin descripción', raw)
+            if protocolo_lote:
+                logger.success(f"Lote recibido — código: {codigo} | dProtConsLote: {protocolo_lote}")
+            else:
+                logger.info(f"Respuesta envío lote — código: {codigo} | {desc}")
+            return resp
+        except Exception as e:
+            logger.error(f"Error parseando respuesta lote XML: {e}")
+            return RespuestaSIFEN('ERR', str(e), {})
+
+    def _parsear_respuesta_consulta_lote_xml(self, xml_bytes: bytes) -> RespuestaSIFEN:
+        """
+        Parsea la respuesta de consultar_lote_directo (rResEnviConsLoteDe).
+        Cuando código es 0362 (procesado), extrae el detalle por CDC en raw['detalle_des'].
+        """
+        try:
+            root = etree.fromstring(xml_bytes)
+            ns   = 'http://ekuatia.set.gov.py/sifen/xsd'
+
+            def _txt(tag, parent=None):
+                el = (parent or root).find('.//{%s}%s' % (ns, tag))
+                return el.text.strip() if el is not None and el.text else ''
+
+            codigo = _txt('dCodResLot') or _txt('dCodRes')
+            desc   = _txt('dMsgResLot') or _txt('dMsgRes')
+
+            des = []
+            if codigo == '0362':
+                for proc_el in root.findall('.//{%s}gResProcLote' % ns):
+                    des.append({
+                        'cdc':     _txt('id',      proc_el),
+                        'estado':  _txt('dEstRes', proc_el),
+                        'codigo':  _txt('dCodRes', proc_el),
+                        'mensaje': _txt('dMsgRes', proc_el),
+                    })
+
+            raw  = {
+                'xml':         xml_bytes.decode('utf-8', errors='replace'),
+                'detalle_des': des,
+            }
+            resp = RespuestaSIFEN(codigo or 'ERR', desc or 'Sin descripción', raw)
+            logger.info(f"Consulta lote — código: {codigo} | {desc} | DEs: {len(des)}")
+            return resp
+        except Exception as e:
+            logger.error(f"Error parseando respuesta consulta lote: {e}")
             return RespuestaSIFEN('ERR', str(e), {})
 
     def _parsear_respuesta_de(self, result) -> RespuestaSIFEN:

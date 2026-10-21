@@ -20,10 +20,14 @@ CREATE TABLE IF NOT EXISTS documentos_electronicos (
 
     -- Estado SIFEN
     estado                  VARCHAR(20) NOT NULL DEFAULT 'pendiente',
-    -- 'pendiente' | 'aprobado' | 'rechazado' | 'duplicado' | 'error'
+    -- 'pendiente' | 'aprobado' | 'rechazado' | 'cancelado' | 'inutilizado' | 'error'
+    -- pendiente  = sin respuesta de SIFEN (falla de comunicación) → reenvío por lote
+    -- error      = respuesta no parseable o código desconocido    → consultar CDC primero
+    -- rechazado  = SIFEN rechazó con código conocido              → requiere doc nuevo
     codigo_sifen            VARCHAR(10),                 -- ej: 0260, 1001, 0160
     descripcion_sifen       TEXT,                        -- mensaje de SIFEN
     protocolo_autorizacion  VARCHAR(50),                 -- dProtAut (solo si aprobado)
+    protocolo_lote          VARCHAR(50),                 -- dProtConsLote del lote async
     respuesta_xml           TEXT,                        -- XML completo de respuesta
 
     -- Documento referenciado (para NCE, NDE, NRE)
@@ -44,13 +48,23 @@ CREATE INDEX IF NOT EXISTS idx_de_fecha      ON documentos_electronicos (fecha_e
 CREATE INDEX IF NOT EXISTS idx_de_ruc_rec    ON documentos_electronicos (ruc_receptor);
 CREATE INDEX IF NOT EXISTS idx_de_cdc_ref    ON documentos_electronicos (cdc_doc_referenciado);
 
--- Migración para BD existentes (agrega columna si no existe)
+-- Migraciones para BD existentes (agregan columnas si no existen)
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name='documentos_electronicos' AND column_name='cdc_doc_referenciado'
   ) THEN
     ALTER TABLE documentos_electronicos ADD COLUMN cdc_doc_referenciado VARCHAR(44);
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='documentos_electronicos' AND column_name='protocolo_lote'
+  ) THEN
+    ALTER TABLE documentos_electronicos ADD COLUMN protocolo_lote VARCHAR(50);
+    CREATE INDEX IF NOT EXISTS idx_de_protocolo_lote ON documentos_electronicos (protocolo_lote);
   END IF;
 END $$;
 

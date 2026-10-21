@@ -40,6 +40,7 @@ from app.web.configuracion import router as config_router
 from app.web.emision import router as emision_router
 from app.web.clientes import router as clientes_router
 from app.web.productos import router as productos_router
+from app.web.reenvio import router as reenvio_router
 
 app = FastAPI(
     title="SIFEN Paraguay — Facturación Electrónica",
@@ -69,6 +70,7 @@ app.include_router(config_router)
 app.include_router(emision_router)
 app.include_router(clientes_router)
 app.include_router(productos_router)
+app.include_router(reenvio_router)
 
 static_dir = Path(__file__).parent / 'static'
 static_dir.mkdir(exist_ok=True)

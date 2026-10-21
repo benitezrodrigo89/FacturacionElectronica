@@ -41,11 +41,17 @@ class TestCodigoAEstado:
     def test_0160_es_rechazado(self):
         assert _codigo_a_estado('0160') == 'rechazado'
 
-    def test_codigo_desconocido_es_rechazado(self):
+    def test_codigo_numerico_desconocido_es_rechazado(self):
         assert _codigo_a_estado('9999') == 'rechazado'
 
-    def test_err_es_rechazado(self):
-        assert _codigo_a_estado('ERR') == 'rechazado'
+    def test_err_es_error(self):
+        assert _codigo_a_estado('ERR') == 'error'
+
+    def test_vacio_es_error(self):
+        assert _codigo_a_estado('') == 'error'
+
+    def test_codigo_no_numerico_es_error(self):
+        assert _codigo_a_estado('TIMEOUT') == 'error'
 
 
 class TestCodigoConsultaAEstado:

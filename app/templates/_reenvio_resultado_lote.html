@@ -1,0 +1,53 @@
+{% if error_general %}
+<div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle me-1"></i>{{ error_general }}</div>
+{% elif resultado.en_proceso %}
+<div class="d-flex align-items-center gap-2 flex-wrap">
+  <span class="badge bg-warning text-dark">En procesamiento</span>
+  <span class="text-muted small">Lote {{ protocolo_lote }} aún no terminó (código 0361). Esperá unos minutos.</span>
+  <button class="btn btn-sm btn-outline-primary"
+          hx-post="/reenvio/consultar-lote/{{ protocolo_lote }}"
+          hx-target="closest div"
+          hx-swap="outerHTML">
+    <i class="bi bi-arrow-clockwise me-1"></i>Reintentar
+  </button>
+</div>
+{% elif resultado.procesado %}
+<div>
+  <span class="badge bg-success me-1">Lote procesado</span>
+  <span class="text-muted small">{{ resultado.des|length }} documento(s):</span>
+  {% if resultado.des %}
+  <table class="table table-sm mt-2 mb-0">
+    <thead class="table-light"><tr><th>CDC</th><th>Estado SIFEN</th><th>Código</th><th>Mensaje</th></tr></thead>
+    <tbody>
+    {% for de in resultado.des %}
+    <tr>
+      <td><code class="cdc">{{ de.cdc[:20] if de.cdc else '—' }}…</code></td>
+      <td>
+        {% if de.estado == 'Aprobado' or de.codigo == '0260' %}
+        <span class="badge bg-success">Aprobado</span>
+        {% else %}
+        <span class="badge bg-danger">{{ de.estado or 'Rechazado' }}</span>
+        {% endif %}
+      </td>
+      <td><code>{{ de.codigo or '—' }}</code></td>
+      <td class="small text-muted">{{ de.mensaje or '—' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% else %}
+<div class="d-flex align-items-center gap-2 flex-wrap">
+  <span class="badge bg-secondary">{{ resultado.codigo }}</span>
+  <span class="text-muted small">{{ resultado.msg }}</span>
+  {% if resultado.codigo not in ('0364',) %}
+  <button class="btn btn-sm btn-outline-secondary"
+          hx-post="/reenvio/consultar-lote/{{ protocolo_lote }}"
+          hx-target="closest div"
+          hx-swap="outerHTML">
+    <i class="bi bi-search me-1"></i>Consultar de nuevo
+  </button>
+  {% endif %}
+</div>
+{% endif %}
