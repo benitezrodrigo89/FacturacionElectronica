@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block content %}
+<input type="hidden" id="api-key" value="{{ api_key }}">
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0 fw-semibold"><i class="bi bi-file-earmark-plus me-1"></i>Nueva Nota de Débito (NDE)</h5>
+  <a href="/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+</div>
+
+<!-- Receptor -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-primary text-white">
+    <i class="bi bi-person me-1"></i>Datos del Receptor
+  </div>
+  <div class="card-body">
+    <div class="mb-3 position-relative">
+      <label class="form-label text-muted small">Buscar cliente guardado</label>
+      <input type="text" id="buscar-cliente" class="form-control form-control-sm"
+             placeholder="Escribí razón social o RUC…"
+             hx-get="/clientes/buscar" hx-trigger="keyup changed delay:300ms"
+             hx-target="#resultados-cliente" name="q" autocomplete="off">
+      <div id="resultados-cliente" class="list-group shadow-sm position-absolute w-100"
+           style="z-index:1000; top:100%"></div>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">RUC <span class="text-danger">*</span></label>
+        <input type="text" id="ruc" class="form-control" placeholder="1234567-8" required>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Razón Social <span class="text-danger">*</span></label>
+        <input type="text" id="razon_social" class="form-control" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Dirección</label>
+        <input type="text" id="direccion" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Teléfono</label>
+        <input type="text" id="telefono" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Email</label>
+        <input type="email" id="email" class="form-control">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Datos NDE -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-danger text-white">
+    <i class="bi bi-info-circle me-1"></i>Datos de la Nota de Débito
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Motivo <span class="text-danger">*</span></label>
+        <select id="motivo" class="form-select">
+          <option value="1">1 — Devolución y Ajuste de precios</option>
+          <option value="2">2 — Devolución</option>
+          <option value="3">3 — Descuento</option>
+          <option value="4">4 — Bonificación</option>
+          <option value="5">5 — Recupero de costo</option>
+          <option value="6">6 — Recupero de gasto</option>
+          <option value="7">7 — Intereses</option>
+          <option value="8" selected>8 — Otros</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Formato doc. referenciado</label>
+        <select id="formato-ref" class="form-select">
+          <option value="1" selected>Electrónico</option>
+          <option value="2">Impreso</option>
+          <option value="3">Constancia Electrónica</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Selector de factura por RUC -->
+    <div id="selector-facturas-wrap" class="mt-3 d-none">
+      <div id="selector-facturas"></div>
+    </div>
+
+    <!-- CDC de factura referenciada -->
+    <div class="row g-3 mt-1">
+      <div class="col-12">
+        <label class="form-label fw-semibold">CDC Factura Original <span class="text-danger">*</span></label>
+        <input type="text" id="cdc-ref" class="form-control font-monospace"
+               placeholder="Seleccioná una factura arriba o pegá el CDC manualmente (44 dígitos)"
+               maxlength="44">
+        <div id="factura-seleccionada" class="mt-1 d-none">
+          <span class="badge bg-success fs-6">
+            <i class="bi bi-check-circle me-1"></i>
+            <span id="factura-sel-nro"></span> &nbsp;·&nbsp;
+            <span id="factura-sel-monto"></span> &nbsp;·&nbsp;
+            <span id="factura-sel-fecha"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ítems -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-secondary text-white d-flex justify-content-between">
+    <span><i class="bi bi-list-ul me-1"></i>Ítems</span>
+    <button type="button" class="btn btn-sm btn-light" onclick="addItem(true)">
+      <i class="bi bi-plus-circle me-1"></i>Agregar ítem
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:80px">Código</th>
+            <th>Descripción</th>
+            <th style="width:90px">Cantidad</th>
+            <th style="width:130px">Precio Unit.</th>
+            <th style="width:90px">IVA</th>
+            <th style="width:120px" class="text-end">Total</th>
+            <th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+        <tfoot>
+          <tr class="table-light">
+            <td colspan="5" class="text-end fw-semibold pe-3">TOTAL:</td>
+            <td class="text-end fw-bold" id="total-general">₲ 0</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Condición de pago -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2">
+    <i class="bi bi-credit-card me-1"></i>Condición de Pago
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Tipo</label>
+        <select id="tipo-pago" class="form-select" onchange="toggleCredito()">
+          <option value="1">Contado</option>
+          <option value="2">Crédito</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Forma de pago</label>
+        <select id="forma-pago" class="form-select">
+          <option value="1">Efectivo</option>
+          <option value="2">Cheque</option>
+          <option value="3">Tarjeta de Crédito</option>
+          <option value="4">Tarjeta de Débito</option>
+          <option value="5">Transferencia</option>
+          <option value="7">Billetera Electrónica</option>
+          <option value="99">Otro</option>
+        </select>
+      </div>
+    </div>
+    <div id="panel-credito" class="mt-3 p-3 border rounded bg-light" style="display:none">
+      <div class="row g-3 mb-2">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Tipo de crédito</label>
+          <select id="tipo-credito" class="form-select" onchange="toggleTipoCredito()">
+            <option value="1">Plazo</option>
+            <option value="2">Cuota</option>
+          </select>
+        </div>
+        <div class="col-md-4" id="campo-plazo">
+          <label class="form-label fw-semibold">Plazo <span class="text-danger">*</span></label>
+          <input type="text" id="plazo" class="form-control" placeholder="Ej: 30 días" maxlength="15">
+        </div>
+        <div class="col-md-4" id="campo-cuotas" style="display:none">
+          <label class="form-label fw-semibold">Cantidad de cuotas <span class="text-danger">*</span></label>
+          <input type="number" id="num-cuotas" class="form-control" min="1" max="120" value="1"
+                 onchange="generarFilasCuotas()">
+        </div>
+      </div>
+      <div id="tabla-cuotas-wrap" style="display:none">
+        <label class="form-label fw-semibold">Detalle de cuotas</label>
+        <table class="table table-sm table-bordered align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width:60px">#</th>
+              <th>Monto (Gs.)</th>
+              <th>Vencimiento</th>
+            </tr>
+          </thead>
+          <tbody id="cuotas-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="resultado"></div>
+
+<div class="d-flex gap-2 mt-3">
+  <button type="button" id="btn-emitir" class="btn btn-danger" onclick="submitNDE()">
+    <i class="bi bi-send me-1"></i>Emitir
+  </button>
+  <a href="/" class="btn btn-outline-secondary">Cancelar</a>
+</div>
+
+<script src="/static/emision.js"></script>
+<script>
+  addItem(true);
+
+  function buscarFacturasPorRuc(ruc) {
+    if (!ruc || ruc.length < 3) {
+      document.getElementById('selector-facturas-wrap').classList.add('d-none');
+      return;
+    }
+    htmx.ajax('GET', `/facturas/aprobadas-por-ruc?ruc=${encodeURIComponent(ruc)}`, {
+      target: '#selector-facturas',
+      swap: 'innerHTML',
+    });
+    document.getElementById('selector-facturas-wrap').classList.remove('d-none');
+  }
+
+  document.getElementById('ruc').addEventListener('change', function() {
+    buscarFacturasPorRuc(this.value.trim());
+  });
+
+  document.addEventListener('click', function(e) {
+    const item = e.target.closest('.cliente-resultado');
+    if (item) {
+      document.getElementById('ruc').value          = item.dataset.ruc;
+      document.getElementById('razon_social').value = item.dataset.razon;
+      document.getElementById('direccion').value    = item.dataset.direccion;
+      document.getElementById('telefono').value     = item.dataset.telefono;
+      document.getElementById('email').value        = item.dataset.email;
+      document.getElementById('buscar-cliente').value = '';
+      document.getElementById('resultados-cliente').innerHTML = '';
+      buscarFacturasPorRuc(item.dataset.ruc);
+      return;
+    }
+    const factura = e.target.closest('.factura-ref-item');
+    if (factura) {
+      document.getElementById('cdc-ref').value = factura.dataset.cdc;
+      document.getElementById('factura-sel-nro').textContent   = factura.dataset.nro;
+      document.getElementById('factura-sel-monto').textContent = 'Gs. ' + Number(factura.dataset.monto).toLocaleString('es-PY');
+      document.getElementById('factura-sel-fecha').textContent = factura.dataset.fecha;
+      document.getElementById('factura-seleccionada').classList.remove('d-none');
+      document.querySelectorAll('.factura-ref-item').forEach(b => b.classList.remove('active'));
+      factura.classList.add('active');
+      return;
+    }
+    if (!e.target.closest('#buscar-cliente') && !e.target.closest('#resultados-cliente')) {
+      document.getElementById('resultados-cliente').innerHTML = '';
+    }
+  });
+
+  document.getElementById('cdc-ref').addEventListener('input', function() {
+    if (this.value.length !== 44) {
+      document.getElementById('factura-seleccionada').classList.add('d-none');
+      document.querySelectorAll('.factura-ref-item').forEach(b => b.classList.remove('active'));
+    }
+  });
+
+  function toggleCredito() {
+    const esCredito = document.getElementById('tipo-pago').value === '2';
+    document.getElementById('panel-credito').style.display = esCredito ? '' : 'none';
+    if (esCredito) toggleTipoCredito();
+  }
+
+  function toggleTipoCredito() {
+    const esCuota = document.getElementById('tipo-credito').value === '2';
+    document.getElementById('campo-plazo').style.display       = esCuota ? 'none' : '';
+    document.getElementById('campo-cuotas').style.display      = esCuota ? '' : 'none';
+    document.getElementById('tabla-cuotas-wrap').style.display = esCuota ? '' : 'none';
+    if (esCuota) generarFilasCuotas();
+  }
+
+  function generarFilasCuotas() {
+    const n = parseInt(document.getElementById('num-cuotas').value) || 1;
+    const tbody = document.getElementById('cuotas-body');
+    const vals  = Array.from(tbody.querySelectorAll('tr')).map(tr => ({
+      monto: tr.querySelector('.cuota-monto')?.value || '',
+      fecha: tr.querySelector('.cuota-fecha')?.value || '',
+    }));
+    tbody.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-center text-muted">${i + 1}</td>
+        <td><input type="number" class="form-control form-control-sm cuota-monto" min="1" value="${vals[i]?.monto || ''}"></td>
+        <td><input type="date"   class="form-control form-control-sm cuota-fecha"        value="${vals[i]?.fecha || ''}"></td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function buildCredito() {
+    const tipoPago = parseInt(document.getElementById('tipo-pago').value);
+    if (tipoPago !== 2) return null;
+    const tipoCredito = parseInt(document.getElementById('tipo-credito').value);
+    if (tipoCredito === 1) {
+      const plazo = document.getElementById('plazo').value.trim();
+      if (plazo.length < 2) { alert('El plazo debe tener al menos 2 caracteres.'); return false; }
+      return { tipo: 1, plazo };
+    }
+    const cuotas = parseInt(document.getElementById('num-cuotas').value);
+    const filas  = document.getElementById('cuotas-body').querySelectorAll('tr');
+    const info_cuotas = [];
+    for (let i = 0; i < filas.length; i++) {
+      const monto = parseInt(filas[i].querySelector('.cuota-monto').value);
+      const fecha = filas[i].querySelector('.cuota-fecha').value;
+      if (!monto || !fecha) { alert(`Completá monto y vencimiento de la cuota ${i + 1}.`); return false; }
+      info_cuotas.push({ moneda: 'PYG', monto, vencimiento: fecha });
+    }
+    return { tipo: 2, cuotas, info_cuotas };
+  }
+
+  function submitNDE() {
+    const items = getItems(true);
+    if (!items.length) { alert('Agregá al menos un ítem.'); return; }
+    if (!document.getElementById('ruc').value.trim()) { alert('El RUC del receptor es obligatorio.'); return; }
+    if (!document.getElementById('razon_social').value.trim()) { alert('La razón social es obligatoria.'); return; }
+
+    const cdcRef = document.getElementById('cdc-ref').value.trim();
+    if (cdcRef.length !== 44) {
+      alert('El CDC de la factura original debe tener exactamente 44 dígitos.');
+      document.getElementById('cdc-ref').focus();
+      return;
+    }
+
+    const credito = buildCredito();
+    if (credito === false) return;
+
+    const total = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+    const condicion_pago = {
+      tipo:       parseInt(document.getElementById('tipo-pago').value),
+      forma_pago: parseInt(document.getElementById('forma-pago').value),
+      monto:      total,
+    };
+    if (credito) condicion_pago.credito = credito;
+
+    const payload = {
+      receptor: {
+        ruc:          document.getElementById('ruc').value.trim(),
+        razon_social: document.getElementById('razon_social').value.trim(),
+        direccion:    document.getElementById('direccion').value.trim() || null,
+        telefono:     document.getElementById('telefono').value.trim() || null,
+        email:        document.getElementById('email').value.trim() || null,
+      },
+      items,
+      motivo: parseInt(document.getElementById('motivo').value),
+      condicion_pago,
+      documento_referencia: {
+        cdc:     cdcRef,
+        formato: parseInt(document.getElementById('formato-ref').value),
+        numero:  null,
+      },
+    };
+
+    enviarAPI('/api/v1/notas-debito', payload);
+  }
+</script>
+{% endblock %}

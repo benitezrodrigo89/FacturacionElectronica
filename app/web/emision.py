@@ -27,6 +27,16 @@ async def form_nota_credito(request: Request):
     return templates.TemplateResponse(request, 'emision/nota_credito.html', _ctx(request))
 
 
+@router.get('/emitir/nota-debito', response_class=HTMLResponse)
+async def form_nota_debito(request: Request):
+    return templates.TemplateResponse(request, 'emision/nota_debito.html', _ctx(request))
+
+
 @router.get('/emitir/nota-remision', response_class=HTMLResponse)
 async def form_nota_remision(request: Request):
     return templates.TemplateResponse(request, 'emision/nota_remision.html', _ctx(request))
+
+
+@router.get('/emitir/autofactura', response_class=HTMLResponse)
+async def form_autofactura(request: Request):
+    return templates.TemplateResponse(request, 'emision/autofactura.html', _ctx(request))

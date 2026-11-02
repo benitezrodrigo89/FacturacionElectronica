@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block content %}
+<input type="hidden" id="api-key" value="{{ api_key }}">
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0 fw-semibold"><i class="bi bi-file-earmark-person me-1"></i>Nueva Autofactura (AFE)</h5>
+  <a href="/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+</div>
+
+<div class="alert alert-info py-2 small mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  La autofactura se emite cuando la empresa compra a una <strong>persona física no contribuyente</strong>.
+  El emisor del documento es la empresa; el vendedor es la persona física.
+</div>
+
+<!-- Datos del Vendedor (persona física) -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-info text-dark">
+    <i class="bi bi-person-badge me-1"></i>Datos del Vendedor (persona física)
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Nombre completo <span class="text-danger">*</span></label>
+        <input type="text" id="vendedor-nombre" class="form-control" placeholder="Juan Pérez" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Tipo de documento <span class="text-danger">*</span></label>
+        <select id="vendedor-doc-tipo" class="form-select">
+          <option value="1">CI (Cédula de Identidad)</option>
+          <option value="5">Pasaporte</option>
+          <option value="6">Cédula de Extranjería</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Nro. de documento <span class="text-danger">*</span></label>
+        <input type="text" id="vendedor-doc-numero" class="form-control" placeholder="Solo dígitos" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Naturaleza del vendedor</label>
+        <select id="vendedor-tipo" class="form-select">
+          <option value="1" selected>No contribuyente</option>
+          <option value="2">Extranjero</option>
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Dirección</label>
+        <input type="text" id="vendedor-direccion" class="form-control" value="Sin especificar">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Nro. de casa</label>
+        <input type="text" id="vendedor-casa" class="form-control" value="0">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Constancia de no ser contribuyente -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-warning text-dark">
+    <i class="bi bi-file-earmark-check me-1"></i>Constancia de No ser Contribuyente
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Número de constancia <span class="text-danger">*</span>
+          <span class="text-muted small">(11 dígitos)</span></label>
+        <input type="text" id="constancia-numero" class="form-control font-monospace"
+               placeholder="00000000000" maxlength="11" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Número de control <span class="text-danger">*</span>
+          <span class="text-muted small">(8 caracteres)</span></label>
+        <input type="text" id="constancia-control" class="form-control font-monospace"
+               placeholder="00000000" maxlength="8" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Lugar de la transacción</label>
+        <input type="text" id="constancia-lugar" class="form-control" value="Asunción">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ítems -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2 bg-secondary text-white d-flex justify-content-between">
+    <span><i class="bi bi-list-ul me-1"></i>Ítems comprados</span>
+    <button type="button" class="btn btn-sm btn-light" onclick="addItem(true)">
+      <i class="bi bi-plus-circle me-1"></i>Agregar ítem
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:80px">Código</th>
+            <th>Descripción</th>
+            <th style="width:90px">Cantidad</th>
+            <th style="width:130px">Precio Unit.</th>
+            <th style="width:90px">IVA</th>
+            <th style="width:120px" class="text-end">Total</th>
+            <th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+        <tfoot>
+          <tr class="table-light">
+            <td colspan="5" class="text-end fw-semibold pe-3">TOTAL:</td>
+            <td class="text-end fw-bold" id="total-general">₲ 0</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Condición de pago -->
+<div class="card mb-3">
+  <div class="card-header fw-semibold py-2">
+    <i class="bi bi-credit-card me-1"></i>Condición de Pago
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Tipo</label>
+        <select id="tipo-pago" class="form-select" onchange="toggleCredito()">
+          <option value="1">Contado</option>
+          <option value="2">Crédito</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Forma de pago</label>
+        <select id="forma-pago" class="form-select">
+          <option value="1">Efectivo</option>
+          <option value="2">Cheque</option>
+          <option value="3">Tarjeta de Crédito</option>
+          <option value="4">Tarjeta de Débito</option>
+          <option value="5">Transferencia</option>
+          <option value="7">Billetera Electrónica</option>
+          <option value="99">Otro</option>
+        </select>
+      </div>
+    </div>
+    <div id="panel-credito" class="mt-3 p-3 border rounded bg-light" style="display:none">
+      <div class="row g-3 mb-2">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Tipo de crédito</label>
+          <select id="tipo-credito" class="form-select" onchange="toggleTipoCredito()">
+            <option value="1">Plazo</option>
+            <option value="2">Cuota</option>
+          </select>
+        </div>
+        <div class="col-md-4" id="campo-plazo">
+          <label class="form-label fw-semibold">Plazo <span class="text-danger">*</span></label>
+          <input type="text" id="plazo" class="form-control" placeholder="Ej: 30 días" maxlength="15">
+        </div>
+        <div class="col-md-4" id="campo-cuotas" style="display:none">
+          <label class="form-label fw-semibold">Cantidad de cuotas <span class="text-danger">*</span></label>
+          <input type="number" id="num-cuotas" class="form-control" min="1" max="120" value="1"
+                 onchange="generarFilasCuotas()">
+        </div>
+      </div>
+      <div id="tabla-cuotas-wrap" style="display:none">
+        <label class="form-label fw-semibold">Detalle de cuotas</label>
+        <table class="table table-sm table-bordered align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width:60px">#</th>
+              <th>Monto (Gs.)</th>
+              <th>Vencimiento</th>
+            </tr>
+          </thead>
+          <tbody id="cuotas-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="resultado"></div>
+
+<div class="d-flex gap-2 mt-3">
+  <button type="button" id="btn-emitir" class="btn btn-info" onclick="submitAFE()">
+    <i class="bi bi-send me-1"></i>Emitir
+  </button>
+  <a href="/" class="btn btn-outline-secondary">Cancelar</a>
+</div>
+
+<script src="/static/emision.js"></script>
+<script>
+  addItem(true);
+
+  function toggleCredito() {
+    const esCredito = document.getElementById('tipo-pago').value === '2';
+    document.getElementById('panel-credito').style.display = esCredito ? '' : 'none';
+    if (esCredito) toggleTipoCredito();
+  }
+
+  function toggleTipoCredito() {
+    const esCuota = document.getElementById('tipo-credito').value === '2';
+    document.getElementById('campo-plazo').style.display       = esCuota ? 'none' : '';
+    document.getElementById('campo-cuotas').style.display      = esCuota ? '' : 'none';
+    document.getElementById('tabla-cuotas-wrap').style.display = esCuota ? '' : 'none';
+    if (esCuota) generarFilasCuotas();
+  }
+
+  function generarFilasCuotas() {
+    const n = parseInt(document.getElementById('num-cuotas').value) || 1;
+    const tbody = document.getElementById('cuotas-body');
+    const vals  = Array.from(tbody.querySelectorAll('tr')).map(tr => ({
+      monto: tr.querySelector('.cuota-monto')?.value || '',
+      fecha: tr.querySelector('.cuota-fecha')?.value || '',
+    }));
+    tbody.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-center text-muted">${i + 1}</td>
+        <td><input type="number" class="form-control form-control-sm cuota-monto" min="1" value="${vals[i]?.monto || ''}"></td>
+        <td><input type="date"   class="form-control form-control-sm cuota-fecha"        value="${vals[i]?.fecha || ''}"></td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function buildCredito() {
+    const tipoPago = parseInt(document.getElementById('tipo-pago').value);
+    if (tipoPago !== 2) return null;
+    const tipoCredito = parseInt(document.getElementById('tipo-credito').value);
+    if (tipoCredito === 1) {
+      const plazo = document.getElementById('plazo').value.trim();
+      if (plazo.length < 2) { alert('El plazo debe tener al menos 2 caracteres.'); return false; }
+      return { tipo: 1, plazo };
+    }
+    const cuotas = parseInt(document.getElementById('num-cuotas').value);
+    const filas  = document.getElementById('cuotas-body').querySelectorAll('tr');
+    const info_cuotas = [];
+    for (let i = 0; i < filas.length; i++) {
+      const monto = parseInt(filas[i].querySelector('.cuota-monto').value);
+      const fecha = filas[i].querySelector('.cuota-fecha').value;
+      if (!monto || !fecha) { alert(`Completá monto y vencimiento de la cuota ${i + 1}.`); return false; }
+      info_cuotas.push({ moneda: 'PYG', monto, vencimiento: fecha });
+    }
+    return { tipo: 2, cuotas, info_cuotas };
+  }
+
+  function submitAFE() {
+    const nombre = document.getElementById('vendedor-nombre').value.trim();
+    const docNum = document.getElementById('vendedor-doc-numero').value.trim().replace(/\D/g, '');
+    if (!nombre) { alert('El nombre del vendedor es obligatorio.'); return; }
+    if (!docNum) { alert('El número de documento del vendedor es obligatorio (solo dígitos).'); return; }
+
+    const constNro     = document.getElementById('constancia-numero').value.trim();
+    const constControl = document.getElementById('constancia-control').value.trim();
+    if (constNro.length !== 11 || !/^\d+$/.test(constNro)) {
+      alert('El número de constancia debe tener exactamente 11 dígitos numéricos.');
+      document.getElementById('constancia-numero').focus();
+      return;
+    }
+    if (constControl.length !== 8) {
+      alert('El número de control de la constancia debe tener exactamente 8 caracteres.');
+      document.getElementById('constancia-control').focus();
+      return;
+    }
+
+    const items = getItems(true);
+    if (!items.length) { alert('Agregá al menos un ítem.'); return; }
+
+    const credito = buildCredito();
+    if (credito === false) return;
+
+    const total = items.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+    const condicion_pago = {
+      tipo:       parseInt(document.getElementById('tipo-pago').value),
+      forma_pago: parseInt(document.getElementById('forma-pago').value),
+      monto:      total,
+    };
+    if (credito) condicion_pago.credito = credito;
+
+    const payload = {
+      vendedor: {
+        nombre,
+        documento_tipo:   parseInt(document.getElementById('vendedor-doc-tipo').value),
+        documento_numero: docNum,
+        tipo_vendedor:    parseInt(document.getElementById('vendedor-tipo').value),
+        direccion:        document.getElementById('vendedor-direccion').value.trim() || 'Sin especificar',
+        numero_casa:      document.getElementById('vendedor-casa').value.trim() || '0',
+      },
+      constancia: {
+        constancia_numero:  constNro,
+        constancia_control: constControl,
+        lugar:              document.getElementById('constancia-lugar').value.trim() || 'Asunción',
+      },
+      items,
+      condicion_pago,
+    };
+
+    enviarAPI('/api/v1/autofacturas', payload);
+  }
+</script>
+{% endblock %}

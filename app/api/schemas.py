@@ -114,6 +114,9 @@ class MotivoNCE(IntEnum):
     OTROS                = 8
 
 
+MotivoNDE = MotivoNCE  # NDE comparte los mismos códigos de motivo
+
+
 class DocumentoReferencia(BaseModel):
     cdc:             str
     timbrado:        Optional[str] = None
@@ -179,6 +182,48 @@ class NotaRemisionRequest(BaseModel):
     direccion_origen:   Optional[str] = Field(default=None, description="Dirección de origen del traslado")
     direccion_destino:  Optional[str] = Field(default=None, description="Dirección de destino del traslado")
     descripcion:        Optional[str] = None
+
+
+class NotaDebitoRequest(BaseModel):
+    receptor:             ReceptorRequest
+    items:                List[ItemRequest] = Field(min_length=1)
+    condicion_pago:       CondicionPagoRequest  = CondicionPagoRequest()
+    motivo:               MotivoNDE             = MotivoNDE.OTROS
+    documento_referencia: Optional[DocumentoReferencia] = Field(
+        default=None, description="Factura original que origina la nota de débito"
+    )
+    descripcion:          Optional[str] = None
+
+
+# ── Autofactura ───────────────────────────────────────────────────────────────
+
+class VendedorRequest(BaseModel):
+    nombre:           str  = Field(description="Nombre completo del vendedor (persona física)")
+    documento_tipo:   int  = Field(default=1, description="Tipo de documento: 1=CI, 5=Pasaporte, 6=Cédula Extranjero")
+    documento_numero: str  = Field(description="Número de documento del vendedor (solo dígitos)")
+    tipo_vendedor:    int  = Field(default=1, description="1=No contribuyente, 2=Extranjero")
+    direccion:        str  = Field(default="Sin especificar")
+    numero_casa:      str  = Field(default="0")
+    departamento:     int  = Field(default=1)
+    distrito:         int  = Field(default=1)
+    ciudad:           int  = Field(default=1)
+
+
+class ConstanciaRequest(BaseModel):
+    constancia_numero:  str = Field(description="Número de la constancia (11 dígitos)")
+    constancia_control: str = Field(description="Número de control de la constancia (8 caracteres)")
+    lugar:              str = Field(default="Asunción", description="Lugar de la transacción")
+    departamento:       int = Field(default=1)
+    distrito:           int = Field(default=1)
+    ciudad:             int = Field(default=1)
+
+
+class AutofacturaRequest(BaseModel):
+    vendedor:      VendedorRequest
+    items:         List[ItemRequest] = Field(min_length=1)
+    condicion_pago: CondicionPagoRequest = CondicionPagoRequest()
+    constancia:    ConstanciaRequest
+    descripcion:   Optional[str] = None
 
 
 class FacturaResponse(BaseModel):

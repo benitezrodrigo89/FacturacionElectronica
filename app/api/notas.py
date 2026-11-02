@@ -15,7 +15,10 @@ from sifen_py.db.repositorio import RepositorioDE
 from app.config_manager import get_sifen_config, load_config
 from app.api.facturas import _build_condicion
 from app.api.auth import require_api_key
-from app.api.schemas import NotaCreditoRequest, NotaRemisionRequest, FacturaResponse
+from app.api.schemas import (
+    NotaCreditoRequest, NotaRemisionRequest, FacturaResponse,
+    NotaDebitoRequest, AutofacturaRequest,
+)
 
 router = APIRouter(prefix='/api/v1', tags=['Notas'])
 
@@ -473,6 +476,258 @@ def _emit_documento(data: dict, tipo_doc: int, cfg: dict, sifen_config,
         protocolo_autorizacion=respuesta.raw.get('protocolo'),
         kude_url=f"/api/v1/facturas/{cdc}/kude",
         fecha_envio=datetime.now(),
+    )
+
+
+# ── Nota de Débito ────────────────────────────────────────────────────────────
+
+MOTIVOS_NDE = MOTIVOS_NCE  # mismos códigos; el generador usa la misma lista
+
+
+def _build_data_nde(req: NotaDebitoRequest, numero_doc: int, cfg: dict) -> dict:
+    total      = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
+    monto_pago = req.condicion_pago.monto or total
+    ruc        = req.receptor.ruc.strip()
+    doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
+    es_prueba  = cfg.get('ambiente') == 'test'
+    codigo_seg = str(random.randint(100_000_000, 999_999_999))
+
+    data = {
+        "tipoDocumento": 6,
+        "establecimiento": cfg['establecimiento'],
+        "punto": cfg['punto_expedicion'],
+        "numero": numero_doc,
+        "codigoSeguridadAleatorio": codigo_seg,
+        "descripcion": req.descripcion or f"Nota de Débito — {MOTIVOS_NDE.get(int(req.motivo), 'Otros')}",
+        "fecha": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "tipoEmision": 1,
+        "tipoTransaccion": 1,
+        "tipoImpuesto": 1,
+        "moneda": "PYG",
+        "timbrado": cfg['timbrado_numero'],
+        "notaCreditoDebito": {
+            "motivo": int(req.motivo),
+        },
+        "cliente": {
+            "contribuyente": True,
+            "ruc": ruc,
+            "razonSocial": req.receptor.razon_social,
+            "tipoOperacion": 1,
+            "direccion": req.receptor.direccion or "Sin especificar",
+            "numeroCasa": "0",
+            "departamento": 1,
+            "departamentoDescripcion": "ASUNCION",
+            "distrito": 1,
+            "distritoDescripcion": "ASUNCION (DISTRITO)",
+            "ciudad": 1,
+            "ciudadDescripcion": "ASUNCION (DISTRITO)",
+            "pais": "PRY",
+            "paisDescripcion": "Paraguay",
+            "tipoContribuyente": 2,
+            "documentoTipo": 1,
+            "documentoNumero": doc_numero,
+            "telefono": req.receptor.telefono or "",
+            "email": req.receptor.email or "",
+        },
+        "usuario": {
+            "documentoTipo": 1,
+            "documentoNumero": doc_numero,
+            "nombre": req.receptor.razon_social,
+            "cargo": "Cliente",
+        },
+        "condicion": _build_condicion(req.condicion_pago, monto_pago),
+        "items": [
+            {
+                "codigo": item.codigo or str(i + 1).zfill(3),
+                "descripcion": _DESC_PRUEBA if es_prueba else item.descripcion,
+                "cantidad": item.cantidad,
+                "precioUnitario": item.precio_unitario,
+                "unidadMedida": item.unidad_medida,
+                "ivaTipo": 1,
+                "ivaBase": 100,
+                "iva": int(item.iva),
+                "cambio": 0.0,
+            }
+            for i, item in enumerate(req.items)
+        ],
+    }
+
+    if req.documento_referencia:
+        ref = req.documento_referencia
+        data["documentoAsociado"] = [{
+            "tipoDocumento": 1,
+            "formato":       ref.formato,
+            "cdc":           ref.cdc,
+            "timbrado":      ref.timbrado or cfg['timbrado_numero'],
+            "establecimiento": ref.establecimiento or cfg['establecimiento'],
+            "punto":         ref.punto or cfg['punto_expedicion'],
+            "numero":        ref.numero or 0,
+            "fecha":         ref.fecha or datetime.now().strftime("%Y-%m-%d"),
+        }]
+
+    return data
+
+
+@router.post('/notas-debito', response_model=FacturaResponse, status_code=201,
+             summary="Emitir Nota de Débito Electrónica (NDE)")
+async def emitir_nota_debito(req: NotaDebitoRequest, _key: str = Depends(require_api_key)):
+    """
+    Genera, firma y envía una Nota de Débito Electrónica (tipo 6) a SIFEN.
+
+    Usada para incrementar el valor de una factura ya emitida (intereses, comisiones, ajustes).
+    Indicar `documento_referencia` con el CDC de la factura original.
+    """
+    cfg          = load_config()
+    sifen_config = get_sifen_config()
+
+    db = Conexion()
+    try:
+        db.crear_base_si_no_existe()
+        db.ejecutar_schema()
+        repo       = RepositorioDE(db)
+        numero_doc = repo.proximo_numero_doc(tipo_documento=6)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Error de base de datos: {e}")
+    finally:
+        db.cerrar()
+
+    data = _build_data_nde(req, numero_doc, cfg)
+    return _emit_documento(
+        data=data,
+        tipo_doc=6,
+        cfg=cfg,
+        sifen_config=sifen_config,
+        ruc_receptor=req.receptor.ruc,
+        razon_social_receptor=req.receptor.razon_social,
+    )
+
+
+# ── Autofactura ────────────────────────────────────────────────────────────────
+
+def _build_data_afe(req: AutofacturaRequest, numero_doc: int, cfg: dict) -> dict:
+    total      = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
+    monto_pago = req.condicion_pago.monto or total
+    es_prueba  = cfg.get('ambiente') == 'test'
+    codigo_seg = str(random.randint(100_000_000, 999_999_999))
+    ruc_emisor = cfg['ruc']
+    doc_emisor = ruc_emisor.split('-')[0] if '-' in ruc_emisor else ruc_emisor
+    v          = req.vendedor
+    c          = req.constancia
+
+    return {
+        "tipoDocumento": 4,
+        "establecimiento": cfg['establecimiento'],
+        "punto": cfg['punto_expedicion'],
+        "numero": numero_doc,
+        "codigoSeguridadAleatorio": codigo_seg,
+        "descripcion": req.descripcion or "Autofactura Electrónica",
+        "fecha": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "tipoEmision": 1,
+        "tipoTransaccion": 1,
+        "tipoImpuesto": 1,
+        "moneda": "PYG",
+        "timbrado": cfg['timbrado_numero'],
+        # El cliente de la AFE es el propio emisor (la empresa compradora)
+        "cliente": {
+            "contribuyente": True,
+            "ruc": ruc_emisor,
+            "razonSocial": cfg.get('razon_social', ''),
+            "tipoOperacion": 1,
+            "direccion": cfg.get('direccion', 'Sin especificar'),
+            "numeroCasa": "0",
+            "departamento": cfg.get('departamento', 1),
+            "departamentoDescripcion": "ASUNCION",
+            "distrito": cfg.get('distrito', 1),
+            "distritoDescripcion": "ASUNCION (DISTRITO)",
+            "ciudad": cfg.get('ciudad', 1),
+            "ciudadDescripcion": "ASUNCION (DISTRITO)",
+            "pais": "PRY",
+            "paisDescripcion": "Paraguay",
+            "tipoContribuyente": 1,
+            "documentoTipo": 1,
+            "documentoNumero": doc_emisor,
+            "telefono": cfg.get('telefono', ''),
+            "email": cfg.get('email', ''),
+        },
+        "usuario": {
+            "documentoTipo": 1,
+            "documentoNumero": doc_emisor,
+            "nombre": cfg.get('razon_social', ''),
+            "cargo": "Responsable",
+        },
+        # Datos del vendedor (persona física no contribuyente)
+        "autoFactura": {
+            "tipoVendedor":    v.tipo_vendedor,
+            "documentoTipo":   v.documento_tipo,
+            "documentoNumero": v.documento_numero,
+            "nombre":          v.nombre,
+            "direccion":       v.direccion,
+            "numeroCasa":      v.numero_casa,
+            "departamento":    v.departamento,
+            "distrito":        v.distrito,
+            "ciudad":          v.ciudad,
+            "ubicacion": {
+                "lugar":        c.lugar,
+                "departamento": c.departamento,
+                "distrito":     c.distrito,
+                "ciudad":       c.ciudad,
+            },
+        },
+        # Constancia de no ser contribuyente
+        "documentoAsociado": [{
+            "constanciaNumero":  c.constancia_numero,
+            "constanciaControl": c.constancia_control,
+        }],
+        "condicion": _build_condicion(req.condicion_pago, monto_pago),
+        "items": [
+            {
+                "codigo": item.codigo or str(i + 1).zfill(3),
+                "descripcion": _DESC_PRUEBA if es_prueba else item.descripcion,
+                "cantidad": item.cantidad,
+                "precioUnitario": item.precio_unitario,
+                "unidadMedida": item.unidad_medida,
+                "ivaTipo": 1,
+                "ivaBase": 100,
+                "iva": int(item.iva),
+                "cambio": 0.0,
+            }
+            for i, item in enumerate(req.items)
+        ],
+    }
+
+
+@router.post('/autofacturas', response_model=FacturaResponse, status_code=201,
+             summary="Emitir Autofactura Electrónica (AFE)")
+async def emitir_autofactura(req: AutofacturaRequest, _key: str = Depends(require_api_key)):
+    """
+    Genera, firma y envía una Autofactura Electrónica (tipo 4) a SIFEN.
+
+    Usada cuando la empresa compra a una persona física no contribuyente.
+    El `vendedor` es la persona física que vendió, y la `constancia` es la
+    Constancia de No ser Contribuyente que entregó el vendedor.
+    """
+    cfg          = load_config()
+    sifen_config = get_sifen_config()
+
+    db = Conexion()
+    try:
+        db.crear_base_si_no_existe()
+        db.ejecutar_schema()
+        repo       = RepositorioDE(db)
+        numero_doc = repo.proximo_numero_doc(tipo_documento=4)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Error de base de datos: {e}")
+    finally:
+        db.cerrar()
+
+    data = _build_data_afe(req, numero_doc, cfg)
+    return _emit_documento(
+        data=data,
+        tipo_doc=4,
+        cfg=cfg,
+        sifen_config=sifen_config,
+        ruc_receptor=cfg['ruc'],
+        razon_social_receptor=cfg.get('razon_social', ''),
     )
 
 
