@@ -770,7 +770,8 @@ class SifenSOAPClient:
             id_lote = str(int(time.time()))
 
         # 1+2. Construir <rLoteDE> y comprimir
-        rdes = ''.join(f'<rDE>{x}</rDE>' for x in xmls_firmados)
+        # xml_firmado ya es el elemento <rDE>…</rDE> completo — no añadir wrapper extra
+        rdes = ''.join(xmls_firmados)
         xml_lote = (
             '<rLoteDE xmlns="http://ekuatia.set.gov.py/sifen/xsd"'
             ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
