@@ -408,8 +408,8 @@ class RepositorioDE:
 
     def marcar_en_lote(self, cdcs: list, protocolo_lote: str):
         """
-        Asocia un conjunto de CDCs al protocolo del lote que los agrupa.
-        Se llama después de recibir el dProtConsLote de SIFEN.
+        Marca los CDCs como 'en_lote' con el dProtConsLote devuelto por SIFEN.
+        Se llama después de recibir código 0300 en enviar_lote_directo().
         """
         if not cdcs:
             return
@@ -417,12 +417,48 @@ class RepositorioDE:
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE documentos_electronicos SET
+                    estado         = 'en_lote',
                     protocolo_lote = %s,
                     fecha_envio    = NOW()
                 WHERE cdc = ANY(%s)
             """, (protocolo_lote, list(cdcs)))
         conn.commit()
-        logger.info(f"CDCs asociados al lote {protocolo_lote}: {len(cdcs)}")
+        logger.info(f"CDCs marcados en_lote — protocolo {protocolo_lote}: {len(cdcs)}")
+
+    def obtener_cdcs_por_protocolo_lote(self, protocolo_lote: str) -> list:
+        """
+        Devuelve los CDCs de todos los DEs asociados a un protocolo_lote dado.
+        Usado por el daemon_consultador para el fallback cuando el lote venció (0364).
+        """
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT cdc, xml_firmado
+                FROM documentos_electronicos
+                WHERE protocolo_lote = %s
+                  AND estado = 'en_lote'
+            """, (protocolo_lote,))
+            rows = cur.fetchall()
+        return [{'cdc': r[0], 'xml_firmado': r[1]} for r in rows]
+
+    def obtener_lotes_para_consultar(self) -> list:
+        """
+        Devuelve los protocolo_lote distintos en estado 'en_lote' cuyo
+        fecha_envio tiene al menos 10 minutos de antigüedad.
+        Listo para que el daemon_consultador llame consultar_lote_directo().
+        """
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT protocolo_lote
+                FROM documentos_electronicos
+                WHERE estado = 'en_lote'
+                  AND protocolo_lote IS NOT NULL
+                  AND protocolo_lote != ''
+                  AND fecha_envio <= NOW() - INTERVAL '10 minutes'
+                ORDER BY protocolo_lote
+            """)
+            return [r[0] for r in cur.fetchall()]
 
     def resumen_por_tipo(self, periodo: str = 'todo') -> dict:
         """Devuelve conteo de documentos aprobados por tipo para el período indicado."""

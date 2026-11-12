@@ -20,10 +20,13 @@ CREATE TABLE IF NOT EXISTS documentos_electronicos (
 
     -- Estado SIFEN
     estado                  VARCHAR(20) NOT NULL DEFAULT 'pendiente',
-    -- 'pendiente' | 'aprobado' | 'rechazado' | 'cancelado' | 'inutilizado' | 'error'
-    -- pendiente  = sin respuesta de SIFEN (falla de comunicación) → reenvío por lote
-    -- error      = respuesta no parseable o código desconocido    → consultar CDC primero
-    -- rechazado  = SIFEN rechazó con código conocido              → requiere doc nuevo
+    -- 'pendiente'  = generado y firmado, esperando que el demonio lo envíe en lote
+    -- 'en_lote'    = enviado en lote a SIFEN (tenemos protocolo_lote), esperando resultado
+    -- 'aprobado'   = SIFEN aprobó el DE (código 0260/0362+Aprobado)
+    -- 'rechazado'  = SIFEN rechazó el DE → requiere documento nuevo
+    -- 'cancelado'  = evento de cancelación aprobado por SIFEN
+    -- 'inutilizado'= rango de numeración inutilizado
+    -- 'error'      = respuesta no parseable o código desconocido → consultar CDC manualmente
     codigo_sifen            VARCHAR(10),                 -- ej: 0260, 1001, 0160
     descripcion_sifen       TEXT,                        -- mensaje de SIFEN
     protocolo_autorizacion  VARCHAR(50),                 -- dProtAut (solo si aprobado)

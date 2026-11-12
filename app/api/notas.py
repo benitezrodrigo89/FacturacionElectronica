@@ -7,7 +7,6 @@ from fastapi.responses import Response
 
 from sifen_py.services.xml_wrapper import XMLGeneratorWrapper
 from sifen_py.services.signer import XMLSigner
-from sifen_py.services.soap_client import SifenSOAPClient
 from sifen_py.generators.kude import KuDEGenerator
 from sifen_py.db.conexion import Conexion
 from sifen_py.db.repositorio import RepositorioDE
@@ -219,24 +218,15 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
     m   = re.search(r'DE Id="([^"]+)"', xml_firmado)
     cdc = m.group(1) if m else ''
 
-    # 5. Guardar como pendiente
-    soap_env = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
-        '<env:Header/><env:Body>'
-        '<rEnviDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
-        f'<dId>1</dId><xDE>{xml_firmado}</xDE>'
-        '</rEnviDe></env:Body></env:Envelope>'
-    )
-    total = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
+    # 5. Guardar en BD — el daemon_enviador se encarga del envío a SIFEN
+    total   = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
+    cdc_ref = req.documento_referencia.cdc if req.documento_referencia else None
     try:
-        cdc_ref = req.documento_referencia.cdc if req.documento_referencia else None
         repo.guardar_pendiente(
             cdc=cdc,
             numero_doc=numero_doc,
             tipo_documento=5,
             xml_firmado=xml_firmado,
-            soap_envelope=soap_env,
             ruc_receptor=req.receptor.ruc,
             razon_social_receptor=req.receptor.razon_social,
             monto_total=total,
@@ -244,39 +234,17 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
             cdc_doc_referenciado=cdc_ref,
         )
     except Exception as e:
-        db.cerrar()
         raise HTTPException(status_code=500, detail=f"Error guardando en BD: {e}")
-
-    # 6. Enviar a SIFEN
-    try:
-        client    = SifenSOAPClient(sifen_config)
-        respuesta = client.enviar_de_directo(xml_firmado)
-    except Exception as e:
-        db.cerrar()
-        raise HTTPException(status_code=502, detail=f"Error enviando a SIFEN: {e}")
-
-    # 7. Actualizar BD
-    try:
-        repo.actualizar_respuesta(
-            cdc=cdc,
-            codigo=respuesta.codigo,
-            descripcion=respuesta.descripcion,
-            respuesta_xml=respuesta.raw.get('xml', ''),
-            protocolo=respuesta.raw.get('protocolo'),
-        )
-    except Exception:
-        pass
     finally:
         db.cerrar()
 
-    estado = 'aprobado' if respuesta.codigo in ('0260', '1001') else 'rechazado'
     return FacturaResponse(
         cdc=cdc,
         numero_doc=numero_doc,
-        estado=estado,
-        codigo_sifen=respuesta.codigo,
-        descripcion_sifen=respuesta.descripcion,
-        protocolo_autorizacion=respuesta.raw.get('protocolo'),
+        estado='pendiente',
+        codigo_sifen=None,
+        descripcion_sifen='',
+        protocolo_autorizacion=None,
         kude_url=f"/api/v1/facturas/{cdc}/kude",
         fecha_envio=datetime.now(),
     )
@@ -393,7 +361,8 @@ def _build_data_nre(req: NotaRemisionRequest, numero_doc: int, cfg: dict) -> dic
 
 def _emit_documento(data: dict, tipo_doc: int, cfg: dict, sifen_config,
                     ruc_receptor: str, razon_social_receptor: str) -> FacturaResponse:
-    """Flujo común: XML → firma → BD → SIFEN → respuesta."""
+    """Flujo común: XML → firma → BD → retorna pendiente.
+    El envío a SIFEN lo realiza el daemon_enviador por lote asíncrono."""
     db   = Conexion()
     repo = None
     try:
@@ -421,59 +390,29 @@ def _emit_documento(data: dict, tipo_doc: int, cfg: dict, sifen_config,
     m   = re.search(r'DE Id="([^"]+)"', xml_firmado)
     cdc = m.group(1) if m else ''
 
-    soap_env = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
-        '<env:Header/><env:Body>'
-        '<rEnviDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
-        f'<dId>1</dId><xDE>{xml_firmado}</xDE>'
-        '</rEnviDe></env:Body></env:Envelope>'
-    )
-
     try:
         repo.guardar_pendiente(
             cdc=cdc,
             numero_doc=numero_doc,
             tipo_documento=tipo_doc,
             xml_firmado=xml_firmado,
-            soap_envelope=soap_env,
             ruc_receptor=ruc_receptor,
             razon_social_receptor=razon_social_receptor,
             monto_total=None,
             data_documento={**data, 'timbrado': cfg['timbrado_numero']},
         )
     except Exception as e:
-        db.cerrar()
         raise HTTPException(status_code=500, detail=f"Error guardando en BD: {e}")
-
-    try:
-        client    = SifenSOAPClient(sifen_config)
-        respuesta = client.enviar_de_directo(xml_firmado)
-    except Exception as e:
-        db.cerrar()
-        raise HTTPException(status_code=502, detail=f"Error enviando a SIFEN: {e}")
-
-    try:
-        repo.actualizar_respuesta(
-            cdc=cdc,
-            codigo=respuesta.codigo,
-            descripcion=respuesta.descripcion,
-            respuesta_xml=respuesta.raw.get('xml', ''),
-            protocolo=respuesta.raw.get('protocolo'),
-        )
-    except Exception:
-        pass
     finally:
         db.cerrar()
 
-    estado = 'aprobado' if respuesta.codigo in ('0260', '1001') else 'rechazado'
     return FacturaResponse(
         cdc=cdc,
         numero_doc=numero_doc,
-        estado=estado,
-        codigo_sifen=respuesta.codigo,
-        descripcion_sifen=respuesta.descripcion,
-        protocolo_autorizacion=respuesta.raw.get('protocolo'),
+        estado='pendiente',
+        codigo_sifen=None,
+        descripcion_sifen='',
+        protocolo_autorizacion=None,
         kude_url=f"/api/v1/facturas/{cdc}/kude",
         fecha_envio=datetime.now(),
     )

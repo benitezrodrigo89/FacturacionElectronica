@@ -7,7 +7,6 @@ from fastapi.responses import Response
 
 from sifen_py.services.xml_wrapper import XMLGeneratorWrapper
 from sifen_py.services.signer import XMLSigner
-from sifen_py.services.soap_client import SifenSOAPClient
 from sifen_py.events.gestor_eventos import GestorEventos
 from sifen_py.generators.kude import KuDEGenerator
 from sifen_py.db.conexion import Conexion
@@ -140,16 +139,17 @@ def _build_data(req: FacturaRequest, numero_doc: int, cfg: dict) -> dict:
              summary="Emitir factura electrónica")
 async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_key)):
     """
-    Emite una Factura Electrónica completa: genera XML, firma con certificado digital y envía a SIFEN.
+    Genera y firma una Factura Electrónica, la guarda en BD como `pendiente` y retorna el CDC.
 
-    **Flujo:** genera XML → firma XMLDSig → guarda en BD como pendiente → envía a SIFEN → actualiza estado.
+    **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
+    El envío a SIFEN lo realiza el daemon_enviador cada 15 minutos por lote asíncrono.
 
     **Número de documento (`numero_doc`):**
     - Si se envía, el sistema lo usa directamente. Útil cuando el ERP/POS ya tiene su propia numeración.
     - Si se omite, se asigna automáticamente el próximo número disponible en la BD.
     - Devuelve `409` si el número ya existe en la base de datos.
 
-    **Respuesta:** CDC de 44 dígitos, estado (`aprobado` / `rechazado`), código SIFEN y URL del KuDE en PDF.
+    **Respuesta:** CDC de 44 dígitos, estado `pendiente`, URL del KuDE en PDF.
     """
     cfg = load_config()
     sifen_config = get_sifen_config()
@@ -199,62 +199,30 @@ async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_ke
     m = re.search(r'DE Id="([^"]+)"', xml_firmado)
     cdc = m.group(1) if m else ''
 
-    # 5. Guardar como pendiente antes de enviar
-    soap_env = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope">'
-        '<env:Header/><env:Body>'
-        '<rEnviDe xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
-        f'<dId>1</dId><xDE>{xml_firmado}</xDE>'
-        '</rEnviDe></env:Body></env:Envelope>'
-    )
+    # 5. Guardar en BD — el daemon_enviador se encarga del envío a SIFEN
     total = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
     try:
         repo.guardar_pendiente(
             cdc=cdc,
             numero_doc=numero_doc,
             xml_firmado=xml_firmado,
-            soap_envelope=soap_env,
             ruc_receptor=req.receptor.ruc,
             razon_social_receptor=req.receptor.razon_social,
             monto_total=total,
             data_documento={**data, 'timbrado': cfg['timbrado_numero']},
         )
     except Exception as e:
-        db.cerrar()
         raise HTTPException(status_code=500, detail=f"Error guardando en BD: {e}")
-
-    # 6. Enviar a SIFEN
-    try:
-        client = SifenSOAPClient(sifen_config)
-        respuesta = client.enviar_de_directo(xml_firmado)
-    except Exception as e:
-        db.cerrar()
-        raise HTTPException(status_code=502, detail=f"Error enviando a SIFEN: {e}")
-
-    # 7. Actualizar BD con respuesta
-    try:
-        repo.actualizar_respuesta(
-            cdc=cdc,
-            codigo=respuesta.codigo,
-            descripcion=respuesta.descripcion,
-            respuesta_xml=respuesta.raw.get('xml', ''),
-            protocolo=respuesta.raw.get('protocolo'),
-        )
-    except Exception:
-        pass
     finally:
         db.cerrar()
-
-    estado = 'aprobado' if respuesta.codigo in ('0260', '1001') else 'rechazado'
 
     return FacturaResponse(
         cdc=cdc,
         numero_doc=numero_doc,
-        estado=estado,
-        codigo_sifen=respuesta.codigo,
-        descripcion_sifen=respuesta.descripcion,
-        protocolo_autorizacion=respuesta.raw.get('protocolo'),
+        estado='pendiente',
+        codigo_sifen=None,
+        descripcion_sifen='',
+        protocolo_autorizacion=None,
         kude_url=f"/api/v1/facturas/{cdc}/kude",
         fecha_envio=datetime.now(),
     )

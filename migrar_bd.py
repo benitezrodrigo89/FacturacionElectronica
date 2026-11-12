@@ -23,6 +23,14 @@ MIGRACIONES = [
     CREATE INDEX IF NOT EXISTS idx_de_protocolo_lote
     ON documentos_electronicos (protocolo_lote);
     """,
+    # v3: flujo async como principal — estado 'en_lote' para DEs enviados en lote
+    # esperando resultado de SIFEN. Los 'pendiente' sin protocolo_lote son los que
+    # aún no fueron enviados por el daemon_enviador.
+    """
+    CREATE INDEX IF NOT EXISTS idx_de_estado_envio
+    ON documentos_electronicos (estado, fecha_envio)
+    WHERE estado = 'en_lote';
+    """,
 ]
 
 def main():
