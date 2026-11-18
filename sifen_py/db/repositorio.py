@@ -396,7 +396,8 @@ class RepositorioDE:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT cdc, xml_firmado, tipo_documento, estado, codigo_sifen
+                SELECT cdc, xml_firmado, tipo_documento, estado, codigo_sifen,
+                       numero_doc, ruc_receptor, razon_social_receptor, monto_total
                 FROM documentos_electronicos
                 WHERE estado IN ('pendiente', 'error')
                   AND tipo_documento = %s

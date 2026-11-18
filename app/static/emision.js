@@ -84,24 +84,36 @@ function getItems(withPrice = true) {
 function mostrarResultado(data, ok) {
   const el = document.getElementById('resultado');
   if (ok) {
-    const aprobado = data.estado === 'aprobado';
-    const estado = aprobado
-      ? '<span class="badge bg-success">Aprobado</span>'
-      : '<span class="badge bg-danger">Rechazado</span>';
+    const aprobado  = data.estado === 'aprobado';
+    const pendiente = data.estado === 'pendiente';
+    const rechazado = data.estado === 'rechazado';
+
+    const estadoBadge = aprobado  ? '<span class="badge bg-success">Aprobado</span>'
+                      : pendiente ? '<span class="badge bg-warning text-dark">Pendiente</span>'
+                      : rechazado ? '<span class="badge bg-danger">Rechazado</span>'
+                      :             `<span class="badge bg-secondary">${data.estado}</span>`;
+
+    const alertClass = aprobado ? 'success' : pendiente ? 'warning' : 'danger';
+    const icon       = aprobado ? 'check' : pendiente ? 'clock' : 'x';
+    const sifen      = (data.codigo_sifen != null)
+                       ? `${data.codigo_sifen} — ${data.descripcion_sifen}`
+                       : pendiente ? 'En cola — se enviará a SIFEN en breve' : '—';
+
     el.innerHTML = `
-      <div class="alert alert-${aprobado ? 'success' : 'danger'} mt-3">
+      <div class="alert alert-${alertClass} mt-3">
         <div class="d-flex justify-content-between align-items-start">
-          <h6 class="mb-2"><i class="bi bi-${aprobado ? 'check' : 'x'}-circle me-1"></i>Documento emitido</h6>
+          <h6 class="mb-2"><i class="bi bi-${icon}-circle me-1"></i>Documento emitido</h6>
           ${aprobado ? `<a href="${data.kude_url}" class="btn btn-sm btn-outline-primary" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>KuDE</a>` : ''}
         </div>
         <div class="row g-1 small">
           <div class="col-12"><strong>CDC:</strong> <code class="small">${data.cdc}</code></div>
           <div class="col-md-3"><strong>N° Doc:</strong> ${data.numero_doc}</div>
-          <div class="col-md-3"><strong>Estado:</strong> ${estado}</div>
-          <div class="col-md-6"><strong>SIFEN:</strong> ${data.codigo_sifen} — ${data.descripcion_sifen}</div>
+          <div class="col-md-3"><strong>Estado:</strong> ${estadoBadge}</div>
+          <div class="col-md-6"><strong>SIFEN:</strong> ${sifen}</div>
           ${data.protocolo_autorizacion ? `<div class="col-12"><strong>Protocolo:</strong> ${data.protocolo_autorizacion}</div>` : ''}
         </div>
-        ${aprobado ? `<div class="mt-2 small text-success">Redirigiendo al dashboard en <span id="countdown">4</span>s… <a href="/" class="text-success fw-semibold">ir ahora</a></div>` : ''}
+        ${aprobado  ? `<div class="mt-2 small text-success">Redirigiendo al dashboard en <span id="countdown">4</span>s… <a href="/" class="text-success fw-semibold">ir ahora</a></div>` : ''}
+        ${pendiente ? `<div class="mt-2 small">El documento quedó guardado. Usá <a href="/reenvio" class="fw-semibold">Reenvío por lote</a> para enviarlo a SIFEN.</div>` : ''}
       </div>`;
     // Si fue aprobado, redirigir al dashboard con countdown
     if (aprobado) {
