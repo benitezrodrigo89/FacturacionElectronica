@@ -40,6 +40,24 @@
   <div class="mt-2 text-muted">No había documentos para procesar.</div>
   {% endif %}
 
+  {# Auto-refresh cuando todo fue resuelto sin enviar lote (aprobados por consulta directa) #}
+  {% if resultado.aprobados and not resultado.protocolo_lote %}
+  <div class="mt-2 small text-muted">
+    Actualizando página en <span id="cd-reenvio">4</span>s…
+    <a href="/reenvio" class="fw-semibold">ir ahora</a>
+  </div>
+  <script>
+    (function() {
+      var s = 4;
+      var t = setInterval(function() {
+        s--; var el = document.getElementById('cd-reenvio');
+        if (el) el.textContent = s;
+        if (s <= 0) { clearInterval(t); window.location.href = '/reenvio'; }
+      }, 1000);
+    })();
+  </script>
+  {% endif %}
+
   {% if resultado.errores %}
   <div class="mt-2">
     <span class="badge bg-danger me-1">{{ resultado.errores|length }}</span> con error:
