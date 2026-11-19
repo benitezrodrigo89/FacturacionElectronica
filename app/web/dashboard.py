@@ -64,6 +64,7 @@ async def tabla_documentos(
     docs = []
     resumen = {}
     resumen_tipo = {}
+    resumen_montos = {}
     docs_ref = {}
     error = None
     try:
@@ -77,6 +78,7 @@ async def tabla_documentos(
         )
         resumen = repo.resumen_estados(periodo=periodo)
         resumen_tipo = repo.resumen_por_tipo(periodo=periodo)
+        resumen_montos = repo.resumen_montos(periodo=periodo)
 
         # Para cada FE/NDE/etc., buscar si tiene NCE/NDE asociada
         for doc in docs:
@@ -95,6 +97,7 @@ async def tabla_documentos(
         "docs_ref": docs_ref,
         "resumen": resumen,
         "resumen_tipo": resumen_tipo,
+        "resumen_montos": resumen_montos,
         "estado_filtro": estado,
         "periodo": periodo,
         "error": error,

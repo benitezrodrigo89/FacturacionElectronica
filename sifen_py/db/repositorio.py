@@ -390,6 +390,20 @@ class RepositorioDE:
             rows = cur.fetchall()
         return {r['estado']: r['total'] for r in rows}
 
+    def resumen_montos(self, periodo: str = 'todo') -> dict:
+        """Devuelve la suma de monto_total por estado para el período indicado."""
+        filtro_fecha = self._FILTROS_PERIODO.get(periodo, '1=1')
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT estado, COALESCE(SUM(monto_total), 0) AS monto
+                FROM documentos_electronicos
+                WHERE {filtro_fecha}
+                GROUP BY estado
+            """)
+            rows = cur.fetchall()
+        return {r['estado']: int(r['monto']) for r in rows}
+
     def obtener_para_reenvio(self, tipo_documento: int = 1, limite: int = 50) -> list:
         """
         Devuelve documentos en estado 'pendiente' o 'error' sin lote asignado,
