@@ -150,29 +150,32 @@ async def consultar_sifen(cdc: str):
             estado_real = 'cancelado' if cancelado else (
                 'aprobado' if resp_sifen.codigo == '0422' else 'rechazado'
             )
-            db2 = Conexion()
-            db2.conectar()
-            repo2 = RepositorioDE(db2)
-            repo2.actualizar_estado_consulta(
-                cdc=cdc,
-                codigo=resp_sifen.codigo,
-                descripcion=resp_sifen.descripcion,
-                protocolo=resp_sifen.raw.get('protocolo'),
-                respuesta_xml=resp_sifen.raw.get('xml'),
-            )
-            # Si SIFEN indica cancelado pero BD local no lo tiene, corregir
-            if cancelado and fila.get('estado') != 'cancelado':
-                conn = db2.conectar()
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "UPDATE documentos_electronicos SET estado='cancelado', updated_at=NOW() WHERE cdc=%s",
-                        (cdc,)
-                    )
-                conn.commit()
-                fila['estado'] = 'cancelado'
-            else:
-                fila['estado'] = estado_real
-            db2.cerrar()
+            estado_bd_actual = fila.get('estado')
+
+            # Si ya está cancelado en BD, no pisar el estado
+            if estado_bd_actual != 'cancelado':
+                db2 = Conexion()
+                db2.conectar()
+                repo2 = RepositorioDE(db2)
+                repo2.actualizar_estado_consulta(
+                    cdc=cdc,
+                    codigo=resp_sifen.codigo,
+                    descripcion=resp_sifen.descripcion,
+                    protocolo=resp_sifen.raw.get('protocolo'),
+                    respuesta_xml=resp_sifen.raw.get('xml'),
+                )
+                if cancelado:
+                    conn = db2.conectar()
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE documentos_electronicos SET estado='cancelado', updated_at=NOW() WHERE cdc=%s",
+                            (cdc,)
+                        )
+                    conn.commit()
+                    fila['estado'] = 'cancelado'
+                else:
+                    fila['estado'] = estado_real
+                db2.cerrar()
         except Exception:
             pass
 
