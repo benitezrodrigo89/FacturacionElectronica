@@ -333,7 +333,27 @@ class SifenSOAPClient:
             raise SOAPException(f"Error HTTP al consultar RUC: {e}") from e
 
         logger.debug(f"HTTP {resp.status_code} — {len(resp.content)} bytes")
-        return self._parsear_respuesta_xml(resp.content)
+        return self._parsear_respuesta_xml_ruc(resp.content)
+
+    def _parsear_respuesta_xml_ruc(self, xml_bytes: bytes) -> RespuestaSIFEN:
+        """Parsea la respuesta XML de consulta de RUC (rRetConsRUC)."""
+        try:
+            root   = etree.fromstring(xml_bytes)
+            ns     = 'http://ekuatia.set.gov.py/sifen/xsd'
+            cod_el = root.find('.//{%s}dCodRes' % ns)
+            msg_el = root.find('.//{%s}dMsgRes' % ns)
+            nom_el = root.find('.//{%s}dNomRazSoc' % ns)
+            codigo = cod_el.text.strip() if cod_el is not None else 'ERR'
+            desc   = msg_el.text.strip() if msg_el is not None else ''
+            nombre = nom_el.text.strip() if nom_el is not None else None
+            logger.info(f"Consulta RUC: código={codigo} nombre={nombre}")
+            return RespuestaSIFEN(codigo, desc, {
+                'razon_social': nombre,
+                'xml': xml_bytes.decode('utf-8', errors='replace'),
+            })
+        except Exception as e:
+            logger.error(f"Error parseando respuesta XML RUC: {e}")
+            return RespuestaSIFEN('ERR', str(e), {})
 
     def enviar_soap_bytes(self, soap_bytes: bytes) -> RespuestaSIFEN:
         """
@@ -1130,8 +1150,18 @@ class SifenSOAPClient:
             raw    = dict(result) if result else {}
             codigo = str(raw.get('dCodRes') or raw.get('codigo') or 'ERR')
             desc   = str(raw.get('dMsgRes') or raw.get('descripcion') or 'Sin descripción')
+            # Extraer razón social de xContRUC o directamente del raw
+            nombre = None
+            cont = raw.get('xContRUC')
+            if cont and hasattr(cont, 'get'):
+                nombre = cont.get('dNomRazSoc')
+            if not nombre:
+                nombre = raw.get('dNomRazSoc')
+            if isinstance(nombre, str):
+                nombre = nombre.strip() or None
+            raw['razon_social'] = nombre
             resp   = RespuestaSIFEN(codigo, desc, raw)
-            logger.info(f"Consulta RUC: {resp}")
+            logger.info(f"Consulta RUC: código={codigo} nombre={nombre}")
             return resp
         except Exception as e:
             logger.error(f"Error parseando respuesta RUC: {e}")

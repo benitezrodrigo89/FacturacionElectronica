@@ -248,6 +248,37 @@ async def sincronizar_estado(cdc: str, estado: str):
     return {"cdc": cdc, "estado_actualizado": estado, "mensaje": "Estado actualizado en BD local"}
 
 
+@router.get('/consultas/ruc/{ruc}', summary="Consultar datos de un RUC en SIFEN")
+async def consultar_ruc_sifen(ruc: str):
+    """
+    Consulta si un RUC existe y está activo en el registro de la SET.
+    Devuelve la razón social cuando el RUC es encontrado (código 0422).
+    """
+    ruc = ruc.strip()
+    if not ruc:
+        raise HTTPException(status_code=400, detail="RUC requerido")
+
+    try:
+        client = SifenSOAPClient(get_sifen_config())
+        try:
+            resp = client.consultar_ruc(ruc)
+        except Exception:
+            resp = client.consultar_ruc_directo(ruc)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Error al conectar con SIFEN: {e}")
+
+    encontrado   = resp.codigo == '0422'
+    razon_social = resp.raw.get('razon_social') if encontrado else None
+
+    return {
+        "ruc":          ruc,
+        "encontrado":   encontrado,
+        "razon_social": razon_social,
+        "codigo":       resp.codigo,
+        "mensaje":      resp.descripcion,
+    }
+
+
 @router.get('/resumen', summary="Resumen de documentos por estado")
 async def resumen():
     db = Conexion()

@@ -209,9 +209,10 @@
   <a href="/" class="btn btn-outline-secondary">Cancelar</a>
 </div>
 
-<script src="/static/emision.js?v=2"></script>
+<script src="/static/emision.js?v=3"></script>
 <script>
   addItem(true);
+  iniciarValidacionRuc();
 
   function buscarFacturasPorRuc(ruc) {
     if (!ruc || ruc.length < 3) {

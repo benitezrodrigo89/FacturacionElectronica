@@ -187,6 +187,52 @@ async function enviarAPI(endpoint, payload) {
   }
 }
 
+// ── Validación de RUC en SIFEN ────────────────────────────────────────────────
+function iniciarValidacionRuc() {
+  const rucEl   = document.getElementById('ruc');
+  const razonEl = document.getElementById('razon_social');
+  if (!rucEl || !razonEl) return;
+
+  const feedbackEl = document.createElement('div');
+  feedbackEl.id = 'ruc-feedback';
+  rucEl.parentNode.insertBefore(feedbackEl, rucEl.nextSibling);
+
+  rucEl.addEventListener('blur', async function() {
+    const ruc = rucEl.value.trim();
+    feedbackEl.innerHTML = '';
+    if (!ruc || ruc.length < 3) return;
+
+    feedbackEl.className = 'form-text mt-1 text-muted';
+    feedbackEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:.75rem;height:.75rem"></span>Validando RUC…';
+
+    try {
+      const apiKey = document.getElementById('api-key')?.value || '';
+      const resp = await fetch(`/api/v1/consultas/ruc/${encodeURIComponent(ruc)}`, {
+        headers: { 'X-API-Key': apiKey },
+      });
+      const data = await resp.json();
+
+      if (data.encontrado) {
+        feedbackEl.className = 'form-text mt-1 text-success';
+        feedbackEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>RUC válido';
+        if (data.razon_social) {
+          razonEl.value = data.razon_social;
+        }
+      } else {
+        feedbackEl.className = 'form-text mt-1 text-danger';
+        feedbackEl.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i>${data.mensaje || 'RUC no encontrado en SIFEN'}`;
+      }
+    } catch (_) {
+      feedbackEl.innerHTML = '';
+    }
+  });
+
+  // Limpiar feedback al empezar a editar de nuevo
+  rucEl.addEventListener('focus', function() {
+    feedbackEl.innerHTML = '';
+  });
+}
+
 // ── Autocomplete de productos en filas de ítems ────────────────────────────────
 document.addEventListener('click', function(e) {
   const item = e.target.closest('.producto-resultado');
