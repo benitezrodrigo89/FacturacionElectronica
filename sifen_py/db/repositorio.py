@@ -160,7 +160,10 @@ class RepositorioDE:
                 UPDATE documentos_electronicos SET
                     estado                 = %(estado)s,
                     codigo_sifen           = %(codigo)s,
-                    descripcion_sifen      = %(descripcion)s,
+                    descripcion_sifen      = CASE
+                        WHEN estado = 'rechazado' THEN descripcion_sifen
+                        ELSE %(descripcion)s
+                    END,
                     protocolo_autorizacion = COALESCE(%(protocolo)s, protocolo_autorizacion),
                     respuesta_xml          = COALESCE(%(respuesta_xml)s, respuesta_xml),
                     fecha_respuesta        = NOW()
