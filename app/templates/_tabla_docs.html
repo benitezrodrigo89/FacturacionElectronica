@@ -117,6 +117,9 @@
                 <span class="badge badge-aprobado rounded-pill">Aprobado</span>
               {% elif doc.estado == 'rechazado' %}
                 <span class="badge badge-rechazado rounded-pill">Rechazado</span>
+                {% if doc.descripcion_sifen %}
+                <div class="small text-danger mt-1" title="{{ doc.descripcion_sifen }}">{{ doc.descripcion_sifen[:60] }}{% if doc.descripcion_sifen | length > 60 %}…{% endif %}</div>
+                {% endif %}
               {% elif doc.estado == 'cancelado' %}
                 <span class="badge bg-secondary rounded-pill">Cancelado</span>
               {% else %}
