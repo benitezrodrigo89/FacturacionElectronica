@@ -1,4 +1,4 @@
-"""Endpoints para Nota de Crédito (NCE) y Nota de Remisión (NRE)."""
+"""Endpoints para Nota de Crédito (NCE), Nota de Débito (NDE), Nota de Remisión (NRE) y Autofactura (AFE)."""
 import re
 import random
 from datetime import datetime
@@ -7,6 +7,7 @@ from fastapi.responses import Response
 
 from sifen_py.services.xml_wrapper import XMLGeneratorWrapper
 from sifen_py.services.signer import XMLSigner
+from sifen_py.services.soap_client import SifenSOAPClient
 from sifen_py.generators.kude import KuDEGenerator
 from sifen_py.db.conexion import Conexion
 from sifen_py.db.repositorio import RepositorioDE
@@ -127,7 +128,10 @@ def _build_data_nce(req: NotaCreditoRequest, numero_doc: int, cfg: dict) -> dict
              summary="Emitir Nota de Crédito Electrónica (NCE)")
 async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(require_api_key)):
     """
-    Genera, firma y envía una Nota de Crédito Electrónica (tipo 5) a SIFEN.
+    Genera y firma una Nota de Crédito Electrónica (tipo 5), la guarda en BD como `pendiente` y retorna el CDC.
+
+    **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
+    El envío a SIFEN se realiza desde la página /reenvio o via el daemon_enviador (cron cada 15 min).
 
     Indicar `documento_referencia` con el CDC de la factura original que se acredita.
     """
@@ -511,7 +515,10 @@ def _build_data_nde(req: NotaDebitoRequest, numero_doc: int, cfg: dict) -> dict:
              summary="Emitir Nota de Débito Electrónica (NDE)")
 async def emitir_nota_debito(req: NotaDebitoRequest, _key: str = Depends(require_api_key)):
     """
-    Genera, firma y envía una Nota de Débito Electrónica (tipo 6) a SIFEN.
+    Genera y firma una Nota de Débito Electrónica (tipo 6), la guarda en BD como `pendiente` y retorna el CDC.
+
+    **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
+    El envío a SIFEN se realiza desde la página /reenvio o via el daemon_enviador (cron cada 15 min).
 
     Usada para incrementar el valor de una factura ya emitida (intereses, comisiones, ajustes).
     Indicar `documento_referencia` con el CDC de la factura original.
@@ -639,7 +646,10 @@ def _build_data_afe(req: AutofacturaRequest, numero_doc: int, cfg: dict) -> dict
              summary="Emitir Autofactura Electrónica (AFE)")
 async def emitir_autofactura(req: AutofacturaRequest, _key: str = Depends(require_api_key)):
     """
-    Genera, firma y envía una Autofactura Electrónica (tipo 4) a SIFEN.
+    Genera y firma una Autofactura Electrónica (tipo 4), la guarda en BD como `pendiente` y retorna el CDC.
+
+    **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
+    El envío a SIFEN se realiza desde la página /reenvio o via el daemon_enviador (cron cada 15 min).
 
     Usada cuando la empresa compra a una persona física no contribuyente.
     El `vendedor` es la persona física que vendió, y la `constancia` es la
@@ -674,7 +684,10 @@ async def emitir_autofactura(req: AutofacturaRequest, _key: str = Depends(requir
              summary="Emitir Nota de Remisión Electrónica (NRE)")
 async def emitir_nota_remision(req: NotaRemisionRequest, _key: str = Depends(require_api_key)):
     """
-    Genera, firma y envía una Nota de Remisión Electrónica (tipo 7) a SIFEN.
+    Genera y firma una Nota de Remisión Electrónica (tipo 7), la guarda en BD como `pendiente` y retorna el CDC.
+
+    **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
+    El envío a SIFEN se realiza desde la página /reenvio o via el daemon_enviador (cron cada 15 min).
 
     Usada para traslado de mercaderías. Los ítems no requieren precio.
     Incluir `transportista` con matrícula del vehículo cuando corresponda.
