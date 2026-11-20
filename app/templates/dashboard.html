@@ -86,6 +86,46 @@
   </div>
 </div>
 
+<!-- Modal corrección de receptor -->
+<div class="modal fade" id="modalCorregir" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-1"></i>Corregir Receptor y Reenviar</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          Documento N° <strong id="corregir-numero"></strong>
+          <br><code id="corregir-cdc" class="small"></code>
+        </p>
+        <div class="alert alert-info small py-2 mb-3">
+          <i class="bi bi-info-circle me-1"></i>
+          El RUC del receptor no forma parte del CDC — podés corregirlo y reenviar con el mismo número de documento.
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">RUC del receptor <span class="text-danger">*</span></label>
+          <input type="text" id="corregir-ruc" class="form-control" placeholder="1234567-8">
+          <div id="corregir-ruc-feedback" class="form-text mt-1"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Razón Social <span class="text-danger">*</span></label>
+          <input type="text" id="corregir-razon" class="form-control">
+        </div>
+        <div id="corregir-resultado" class="d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning" id="btn-confirmar-corregir"
+                onclick="confirmarCorreccion()">
+          <span id="corregir-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
+          <i class="bi bi-send me-1"></i>Corregir y reenviar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal anulación -->
 <div class="modal fade" id="modalAnular" tabindex="-1">
   <div class="modal-dialog">
@@ -186,6 +226,83 @@ function filtrar(btn) {
 
 function setActive(btn) {
   filtrar(btn);
+}
+
+function prepararCorreccion(btn) {
+  document.getElementById('corregir-cdc').textContent    = btn.dataset.cdc;
+  document.getElementById('corregir-numero').textContent = btn.dataset.numero;
+  document.getElementById('corregir-ruc').value          = btn.dataset.ruc   || '';
+  document.getElementById('corregir-razon').value        = btn.dataset.razon || '';
+  document.getElementById('corregir-ruc-feedback').innerHTML = '';
+  document.getElementById('corregir-resultado').className = 'd-none';
+}
+
+document.addEventListener('shown.bs.modal', function(e) {
+  if (e.target.id !== 'modalCorregir') return;
+  const rucEl      = document.getElementById('corregir-ruc');
+  const razonEl    = document.getElementById('corregir-razon');
+  const feedbackEl = document.getElementById('corregir-ruc-feedback');
+  const apiKey     = document.getElementById('api-key').value;
+
+  rucEl.addEventListener('blur', async function handler() {
+    rucEl.removeEventListener('blur', handler);
+    const ruc = rucEl.value.trim();
+    feedbackEl.innerHTML = '';
+    if (!ruc || ruc.length < 3) return;
+    feedbackEl.className = 'form-text mt-1 text-muted';
+    feedbackEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:.75rem;height:.75rem"></span>Validando…';
+    try {
+      const r = await fetch(`/api/v1/consultas/ruc/${encodeURIComponent(ruc)}`, { headers: {'X-API-Key': apiKey} });
+      const d = await r.json();
+      if (d.encontrado) {
+        feedbackEl.className = 'form-text mt-1 text-success';
+        feedbackEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>RUC válido';
+        if (d.razon_social && !razonEl.value.trim()) razonEl.value = d.razon_social;
+      } else {
+        feedbackEl.className = 'form-text mt-1 text-danger';
+        feedbackEl.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i>${d.mensaje || 'RUC no encontrado'}`;
+      }
+    } catch (_) { feedbackEl.innerHTML = ''; }
+  });
+});
+
+async function confirmarCorreccion() {
+  const cdc    = document.getElementById('corregir-cdc').textContent.trim();
+  const ruc    = document.getElementById('corregir-ruc').value.trim();
+  const razon  = document.getElementById('corregir-razon').value.trim();
+  const res    = document.getElementById('corregir-resultado');
+
+  if (!ruc)   { alert('El RUC es obligatorio.'); return; }
+  if (!razon) { alert('La razón social es obligatoria.'); return; }
+
+  const spinner = document.getElementById('corregir-spinner');
+  const btn     = document.getElementById('btn-confirmar-corregir');
+  spinner.classList.remove('d-none');
+  btn.disabled = true;
+
+  try {
+    const params = new URLSearchParams({ ruc, razon_social: razon });
+    const resp = await fetch(`/api/v1/documentos/${cdc}/corregir-receptor?${params}`, {
+      method: 'POST',
+      headers: { 'X-API-Key': document.getElementById('api-key').value },
+    });
+    const data = await resp.json();
+    res.className = '';
+    if (resp.ok) {
+      res.innerHTML = `<div class="alert alert-success mb-0"><i class="bi bi-check-circle me-1"></i>${data.mensaje}</div>`;
+      setTimeout(() => {
+        bootstrap.Modal.getInstance(document.getElementById('modalCorregir')).hide();
+        recargarTabla();
+      }, 1800);
+    } else {
+      res.innerHTML = `<div class="alert alert-danger mb-0">${data.detail || 'Error al corregir'}</div>`;
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + e.message);
+  } finally {
+    spinner.classList.add('d-none');
+    btn.disabled = false;
+  }
 }
 
 function prepararAnulacion(btn) {
