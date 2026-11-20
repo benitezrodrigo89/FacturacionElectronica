@@ -238,6 +238,46 @@ class RepositorioDE:
         conn.commit()
         logger.info(f"DE cancelado — CDC: {cdc[:20]}… | código: {codigo}")
 
+    def corregir_receptor(
+        self,
+        cdc:                    str,
+        xml_firmado:            str,
+        ruc_receptor:           str,
+        razon_social_receptor:  str,
+        data_json_str:          str,
+    ) -> bool:
+        """Aplica corrección de datos del receptor y resetea el DE a pendiente."""
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE documentos_electronicos SET
+                    xml_firmado             = %(xml_firmado)s,
+                    ruc_receptor            = %(ruc_receptor)s,
+                    razon_social_receptor   = %(razon_social_receptor)s,
+                    data_json               = %(data_json)s,
+                    estado                  = 'pendiente',
+                    codigo_sifen            = NULL,
+                    descripcion_sifen       = NULL,
+                    protocolo_lote          = NULL,
+                    protocolo_autorizacion  = NULL,
+                    respuesta_xml           = NULL,
+                    fecha_envio             = NULL,
+                    fecha_respuesta         = NULL,
+                    intentos                = 0
+                WHERE cdc = %(cdc)s
+                  AND estado = 'rechazado'
+            """, {
+                'cdc':                   cdc,
+                'xml_firmado':           xml_firmado,
+                'ruc_receptor':          ruc_receptor,
+                'razon_social_receptor': razon_social_receptor,
+                'data_json':             data_json_str,
+            })
+            updated = cur.rowcount
+        conn.commit()
+        logger.info(f"Receptor corregido — CDC: {cdc[:20]}… | nuevo RUC: {ruc_receptor}")
+        return updated > 0
+
     # ─────────────────────────────────────────────────────────────────
     # LECTURA
     # ─────────────────────────────────────────────────────────────────

@@ -293,6 +293,132 @@ async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depen
     }
 
 
+def _es_error_receptor(codigo: str) -> bool:
+    try:
+        return 1300 <= int(codigo) <= 1349
+    except (ValueError, TypeError):
+        return False
+
+
+@router.post('/documentos/{cdc}/corregir-receptor',
+             summary="Corregir datos del receptor en un documento rechazado")
+async def corregir_receptor(
+    cdc:          str,
+    ruc:          str,
+    razon_social: str,
+    _key: str = Depends(require_api_key),
+):
+    """
+    Corrige el RUC y razón social del receptor en un DE rechazado por SIFEN
+    con código de error 1300-1349 (errores en datos del receptor).
+    Como el RUC del receptor no forma parte del CDC, se reutiliza el mismo
+    número de documento y CDC — solo se regenera y re-firma el XML.
+    El documento vuelve a estado 'pendiente' para ser reenviado por el daemon.
+    """
+    import json as _json
+    if len(cdc) != 44:
+        raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
+
+    ruc          = ruc.strip()
+    razon_social = razon_social.strip()
+    if not ruc or not razon_social:
+        raise HTTPException(status_code=400, detail="RUC y razón social son requeridos")
+
+    # 1. Cargar documento
+    db = Conexion()
+    try:
+        db.conectar()
+        repo = RepositorioDE(db)
+        fila = repo.obtener_por_cdc(cdc)
+        db.cerrar()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if not fila:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+
+    fila = dict(fila) if hasattr(fila, 'keys') else fila
+
+    if fila.get('estado') != 'rechazado':
+        raise HTTPException(
+            status_code=422,
+            detail=f"Solo se pueden corregir documentos rechazados. Estado actual: {fila.get('estado')}"
+        )
+
+    codigo_rechazo = fila.get('codigo_sifen', '')
+    if not _es_error_receptor(codigo_rechazo):
+        raise HTTPException(
+            status_code=422,
+            detail=f"El rechazo (código {codigo_rechazo}) no corresponde a un error del receptor corregible. Use inutilización y emita un documento nuevo."
+        )
+
+    data_json_raw = fila.get('data_json')
+    if not data_json_raw:
+        raise HTTPException(status_code=422, detail="Documento sin datos para regenerar XML")
+
+    # 2. Parchear data con el nuevo receptor
+    try:
+        data = _json.loads(data_json_raw)
+        doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
+        data['cliente']['ruc']             = ruc
+        data['cliente']['razonSocial']     = razon_social
+        data['cliente']['documentoNumero'] = doc_numero
+        if 'usuario' in data:
+            data['usuario']['nombre']          = razon_social
+            data['usuario']['documentoNumero'] = doc_numero
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error procesando datos del documento: {e}")
+
+    # 3. Regenerar XML
+    sifen_config = get_sifen_config()
+    try:
+        wrapper      = XMLGeneratorWrapper(sifen_config)
+        xml_generado = wrapper.generar_xml_de(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error regenerando XML: {e}")
+
+    # 4. Re-firmar
+    try:
+        signer      = XMLSigner(sifen_config)
+        xml_firmado = signer.firmar_xml(xml_generado)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error firmando XML: {e}")
+
+    # 5. Verificar que el CDC no cambió
+    m = re.search(r'DE Id="([^"]+)"', xml_firmado)
+    nuevo_cdc = m.group(1) if m else ''
+    if nuevo_cdc and nuevo_cdc != cdc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"El CDC cambió inesperadamente tras la corrección. CDC original: {cdc[:20]}… CDC nuevo: {nuevo_cdc[:20]}…"
+        )
+
+    # 6. Guardar corrección en BD
+    try:
+        db = Conexion()
+        db.conectar()
+        repo = RepositorioDE(db)
+        ok = repo.corregir_receptor(
+            cdc=cdc,
+            xml_firmado=xml_firmado,
+            ruc_receptor=ruc,
+            razon_social_receptor=razon_social,
+            data_json_str=_json.dumps(data, ensure_ascii=False),
+        )
+        db.cerrar()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error actualizando BD: {e}")
+
+    if not ok:
+        raise HTTPException(status_code=409, detail="No se pudo aplicar la corrección (el documento ya no está en estado rechazado)")
+
+    return {
+        "cdc":     cdc,
+        "estado":  "pendiente",
+        "mensaje": "Corrección aplicada. El documento será reenviado a SIFEN en el próximo ciclo del daemon.",
+    }
+
+
 @router.post('/inutilizaciones', status_code=201, summary="Inutilizar rango de numeración")
 async def inutilizar_numeracion(req: InutilizacionRequest, _key: str = Depends(require_api_key)):
     """
