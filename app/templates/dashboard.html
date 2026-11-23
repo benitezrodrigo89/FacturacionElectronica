@@ -274,7 +274,8 @@ document.addEventListener('shown.bs.modal', function(e) {
       if (d.encontrado) {
         feedbackEl.className = 'form-text mt-1 text-success';
         feedbackEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>RUC válido';
-        if (d.razon_social && !razonEl.value.trim()) razonEl.value = d.razon_social;
+        if (d.ruc_completo) rucEl.value = d.ruc_completo;
+        if (d.razon_social) razonEl.value = d.razon_social;
       } else {
         feedbackEl.className = 'form-text mt-1 text-danger';
         feedbackEl.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i>${d.mensaje || 'RUC no encontrado'}`;

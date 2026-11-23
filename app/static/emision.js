@@ -215,9 +215,8 @@ function iniciarValidacionRuc() {
       if (data.encontrado) {
         feedbackEl.className = 'form-text mt-1 text-success';
         feedbackEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>RUC válido';
-        if (data.razon_social) {
-          razonEl.value = data.razon_social;
-        }
+        if (data.ruc_completo) rucEl.value = data.ruc_completo;
+        if (data.razon_social) razonEl.value = data.razon_social;
       } else {
         feedbackEl.className = 'form-text mt-1 text-danger';
         feedbackEl.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i>${data.mensaje || 'RUC no encontrado en SIFEN'}`;

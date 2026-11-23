@@ -269,11 +269,13 @@ async def consultar_ruc_sifen(ruc: str):
 
     encontrado   = resp.codigo == '0502'
     razon_social = resp.raw.get('razon_social') if encontrado else None
+    ruc_completo = resp.raw.get('ruc_completo') if encontrado else None
 
     return {
         "ruc":          ruc,
         "encontrado":   encontrado,
         "razon_social": razon_social,
+        "ruc_completo": ruc_completo,
         "codigo":       resp.codigo,
         "mensaje":      resp.descripcion,
     }

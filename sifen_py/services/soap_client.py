@@ -339,17 +339,28 @@ class SifenSOAPClient:
         """Parsea la respuesta XML de consulta de RUC (rResEnviConsRUC).
         Código de éxito: 0502. Campo nombre: dRazCons dentro de xContRUC."""
         try:
+            from sifen_py.utils.cdc import calcular_digito_verificador_ruc
             root   = etree.fromstring(xml_bytes)
             ns     = 'http://ekuatia.set.gov.py/sifen/xsd'
             cod_el = root.find('.//{%s}dCodRes' % ns)
             msg_el = root.find('.//{%s}dMsgRes' % ns)
             nom_el = root.find('.//{%s}dRazCons' % ns)
+            ruc_el = root.find('.//{%s}dRUCCons' % ns)
             codigo = cod_el.text.strip() if cod_el is not None else 'ERR'
             desc   = msg_el.text.strip() if msg_el is not None else ''
             nombre = nom_el.text.strip() if nom_el is not None else None
-            logger.info(f"Consulta RUC: código={codigo} nombre={nombre}")
+            ruc_num = ruc_el.text.strip() if ruc_el is not None else None
+            ruc_completo = None
+            if ruc_num:
+                try:
+                    dv = calcular_digito_verificador_ruc(ruc_num)
+                    ruc_completo = f"{ruc_num}-{dv}"
+                except Exception:
+                    pass
+            logger.info(f"Consulta RUC: código={codigo} ruc={ruc_completo} nombre={nombre}")
             return RespuestaSIFEN(codigo, desc, {
                 'razon_social': nombre,
+                'ruc_completo': ruc_completo,
                 'xml': xml_bytes.decode('utf-8', errors='replace'),
             })
         except Exception as e:
