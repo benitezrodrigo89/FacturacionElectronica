@@ -103,16 +103,30 @@
           <i class="bi bi-info-circle me-1"></i>
           El RUC del receptor no forma parte del CDC — podés corregirlo y reenviar con el mismo número de documento.
         </div>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">RUC del receptor <span class="text-danger">*</span></label>
-          <input type="text" id="corregir-ruc" class="form-control" placeholder="1234567-8">
-          <div id="corregir-ruc-feedback" class="form-text mt-1"></div>
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label fw-semibold">RUC <span class="text-danger">*</span></label>
+            <input type="text" id="corregir-ruc" class="form-control" placeholder="1234567-8">
+            <div id="corregir-ruc-feedback" class="form-text mt-1"></div>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label fw-semibold">Razón Social <span class="text-danger">*</span></label>
+            <input type="text" id="corregir-razon" class="form-control">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Dirección</label>
+            <input type="text" id="corregir-direccion" class="form-control" placeholder="Opcional">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Teléfono</label>
+            <input type="text" id="corregir-telefono" class="form-control" placeholder="Opcional">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Email</label>
+            <input type="email" id="corregir-email" class="form-control" placeholder="Opcional">
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Razón Social <span class="text-danger">*</span></label>
-          <input type="text" id="corregir-razon" class="form-control">
-        </div>
-        <div id="corregir-resultado" class="d-none"></div>
+        <div id="corregir-resultado" class="d-none mt-3"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -231,8 +245,11 @@ function setActive(btn) {
 function prepararCorreccion(btn) {
   document.getElementById('corregir-cdc').textContent    = btn.dataset.cdc;
   document.getElementById('corregir-numero').textContent = btn.dataset.numero;
-  document.getElementById('corregir-ruc').value          = btn.dataset.ruc   || '';
-  document.getElementById('corregir-razon').value        = btn.dataset.razon || '';
+  document.getElementById('corregir-ruc').value          = btn.dataset.ruc       || '';
+  document.getElementById('corregir-razon').value        = btn.dataset.razon     || '';
+  document.getElementById('corregir-direccion').value    = btn.dataset.direccion || '';
+  document.getElementById('corregir-telefono').value     = btn.dataset.telefono  || '';
+  document.getElementById('corregir-email').value        = btn.dataset.email     || '';
   document.getElementById('corregir-ruc-feedback').innerHTML = '';
   document.getElementById('corregir-resultado').className = 'd-none';
 }
@@ -281,7 +298,13 @@ async function confirmarCorreccion() {
   btn.disabled = true;
 
   try {
-    const params = new URLSearchParams({ ruc, razon_social: razon });
+    const params = new URLSearchParams({
+      ruc,
+      razon_social: razon,
+      direccion: document.getElementById('corregir-direccion').value.trim(),
+      telefono:  document.getElementById('corregir-telefono').value.trim(),
+      email:     document.getElementById('corregir-email').value.trim(),
+    });
     const resp = await fetch(`/api/v1/documentos/${cdc}/corregir-receptor?${params}`, {
       method: 'POST',
       headers: { 'X-API-Key': document.getElementById('api-key').value },

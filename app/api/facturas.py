@@ -306,13 +306,15 @@ async def corregir_receptor(
     cdc:          str,
     ruc:          str,
     razon_social: str,
+    direccion:    str = '',
+    telefono:     str = '',
+    email:        str = '',
     _key: str = Depends(require_api_key),
 ):
     """
-    Corrige el RUC y razón social del receptor en un DE rechazado por SIFEN
-    con código de error 1300-1349 (errores en datos del receptor).
-    Como el RUC del receptor no forma parte del CDC, se reutiliza el mismo
-    número de documento y CDC — solo se regenera y re-firma el XML.
+    Corrige los datos del receptor en un DE rechazado por SIFEN con código
+    1300-1349 (errores en datos del receptor). Como ningún dato del receptor
+    forma parte del CDC, se reutiliza el mismo número de documento y CDC.
     El documento vuelve a estado 'pendiente' para ser reenviado por el daemon.
     """
     import json as _json
@@ -363,6 +365,12 @@ async def corregir_receptor(
         data['cliente']['ruc']             = ruc
         data['cliente']['razonSocial']     = razon_social
         data['cliente']['documentoNumero'] = doc_numero
+        if direccion.strip():
+            data['cliente']['direccion']   = direccion.strip()
+        if telefono.strip():
+            data['cliente']['telefono']    = telefono.strip()
+        if email.strip():
+            data['cliente']['email']       = email.strip()
         if 'usuario' in data:
             data['usuario']['nombre']          = razon_social
             data['usuario']['documentoNumero'] = doc_numero
