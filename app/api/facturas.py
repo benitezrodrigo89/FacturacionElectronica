@@ -294,6 +294,9 @@ async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depen
 
 
 def _es_error_receptor(codigo: str) -> bool:
+    # 0420 = "DE rechazado" genérico (consulta posterior pisa el código original)
+    if codigo == '0420':
+        return True
     try:
         return 1300 <= int(codigo) <= 1349
     except (ValueError, TypeError):

@@ -159,7 +159,10 @@ class RepositorioDE:
             cur.execute("""
                 UPDATE documentos_electronicos SET
                     estado                 = %(estado)s,
-                    codigo_sifen           = %(codigo)s,
+                    codigo_sifen           = CASE
+                        WHEN estado = 'rechazado' THEN codigo_sifen
+                        ELSE %(codigo)s
+                    END,
                     descripcion_sifen      = CASE
                         WHEN estado = 'rechazado' THEN descripcion_sifen
                         ELSE %(descripcion)s
