@@ -267,12 +267,8 @@ async def consultar_ruc_sifen(ruc: str):
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Error al conectar con SIFEN: {e}")
 
-    encontrado   = resp.codigo == '0422'
+    encontrado   = resp.codigo == '0502'
     razon_social = resp.raw.get('razon_social') if encontrado else None
-
-    # debug: exponer raw para identificar campos reales de SIFEN
-    raw_debug = {k: str(v)[:500] for k, v in resp.raw.items() if k != 'xml'}
-    raw_xml   = resp.raw.get('xml', '')
 
     return {
         "ruc":          ruc,
@@ -280,8 +276,6 @@ async def consultar_ruc_sifen(ruc: str):
         "razon_social": razon_social,
         "codigo":       resp.codigo,
         "mensaje":      resp.descripcion,
-        "_debug_raw":   raw_debug,
-        "_debug_xml":   raw_xml,
     }
 
 
