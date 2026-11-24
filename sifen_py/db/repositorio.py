@@ -353,7 +353,8 @@ class RepositorioDE:
         with conn.cursor() as cur:
             cur.execute(f"""
                 SELECT id, cdc, numero_doc, tipo_documento, estado, codigo_sifen,
-                       protocolo_autorizacion, ruc_receptor, razon_social_receptor,
+                       descripcion_sifen, protocolo_autorizacion,
+                       ruc_receptor, razon_social_receptor,
                        monto_total, fecha_emision, fecha_envio, intentos,
                        data_json IS NOT NULL AS data_json
                 FROM documentos_electronicos
