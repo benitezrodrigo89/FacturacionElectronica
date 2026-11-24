@@ -382,10 +382,7 @@ class XMLSigner:
         hash_input = params + csc_val
         c_hash_qr  = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
 
-        qr_url = url_base + params + f"&cHashQR={c_hash_qr}"
-        print(f"[QR-URL-COMPLETO] {qr_url}", flush=True)
-
-        return qr_url
+        return url_base + params + f"&cHashQR={c_hash_qr}"
 
     def get_certificate_info(self) -> dict:
         """
