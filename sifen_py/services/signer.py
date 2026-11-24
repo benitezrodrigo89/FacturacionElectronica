@@ -150,14 +150,6 @@ class XMLSigner:
                 raise SignatureException("No se encontró el elemento <DE> ni <rEve> en el XML")
             cdc = de_elem.get('Id', '')
 
-            # DEBUG: imprimir sección gDatRec para comparar innominado vs contribuyente
-            sifen_ns_dbg = "http://ekuatia.set.gov.py/sifen/xsd"
-            gdat = de_elem.find('.//{%s}gDatRec' % sifen_ns_dbg)
-            if gdat is not None:
-                import re as _re
-                gdat_str = _re.sub(r'\s+', ' ', etree.tostring(gdat, encoding='unicode'))
-                print(f"[gDatRec] {gdat_str[:400]}", flush=True)
-
             # ── 2. DigestValue sobre <DE> con C14N exclusivo ─────────────────
             # Transforms declarados: enveloped-signature (no-op) + exc-C14N
             de_c14n = etree.tostring(de_elem, method='c14n', exclusive=True)
@@ -363,22 +355,28 @@ class XMLSigner:
             else 'https://ekuatia.set.gov.py/consultas/qr?'
         )
 
-        fe_emi_hex     = _to_hex(_txt('dFeEmiDE'))
-        # Contribuyente: usa dRucRec del XML. No contribuyente: usa dNumIDRec (ej: '0' para innominado)
-        ruc_rec        = _txt('dRucRec') or _txt('dNumIDRec') or '0'
-        tot_gral       = _txt('dTotGralOpe') or '0'
-        tot_iva        = _txt('dTotIVA') or '0'
-        # Contar ítems: cantidad de elementos dCodInt (uno por ítem)
-        c_items        = str(len(de_elem.findall('.//{%s}gCamItem' % sifen_ns)))
-        digest_hex     = digest_value_b64.encode('utf-8').hex()
-        csc_id         = getattr(self.config, 'csc_id', '0001')
-        csc_val        = getattr(self.config, 'csc', '')
+        fe_emi_hex = _to_hex(_txt('dFeEmiDE'))
+        tot_gral   = _txt('dTotGralOpe') or '0'
+        tot_iva    = _txt('dTotIVA') or '0'
+        c_items    = str(len(de_elem.findall('.//{%s}gCamItem' % sifen_ns)))
+        digest_hex = digest_value_b64.encode('utf-8').hex()
+        csc_id     = getattr(self.config, 'csc_id', '0001')
+        csc_val    = getattr(self.config, 'csc', '')
+
+        # Manual Técnico v150 §13.8: el nombre del parámetro receptor cambia según iNatRec.
+        # Contribuyente (iNatRec=1): &dRucRec=XXXXXXX
+        # No contribuyente (iNatRec=2): &dNumIDRec=XXXXXXX
+        nat_rec = _txt('iNatRec')
+        if nat_rec == '2':
+            rec_param = f"&dNumIDRec={_txt('dNumIDRec') or '0'}"
+        else:
+            rec_param = f"&dRucRec={_txt('dRucRec') or '0'}"
 
         params = (
             f"nVersion=150"
             f"&Id={cdc}"
             f"&dFeEmiDE={fe_emi_hex}"
-            f"&dRucRec={ruc_rec}"
+            f"{rec_param}"
             f"&dTotGralOpe={tot_gral}"
             f"&dTotIVA={tot_iva}"
             f"&cItems={c_items}"
