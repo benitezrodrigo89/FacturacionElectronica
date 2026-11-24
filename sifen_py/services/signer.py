@@ -381,6 +381,13 @@ class XMLSigner:
         hash_input = params + csc_val
         c_hash_qr  = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
 
+        logger.debug(
+            "QR params | CDC=%s | dFeEmiDE=%s | dRucRec=%r | dTotGralOpe=%s"
+            " | dTotIVA=%s | cItems=%s | DigestValue=%s... | IdCSC=%s",
+            cdc[:20], _txt('dFeEmiDE'), ruc_rec, tot_gral, tot_iva,
+            c_items, digest_hex[:20], csc_id
+        )
+
         return url_base + params + f"&cHashQR={c_hash_qr}"
 
     def get_certificate_info(self) -> dict:
