@@ -170,7 +170,7 @@
                 <i class="bi bi-x-circle"></i>
               </button>
               {% endif %}
-              {% if doc.estado == 'rechazado' and doc.data_json and (doc.codigo_sifen == '0420' or (doc.codigo_sifen and doc.codigo_sifen | int(0) >= 1300 and doc.codigo_sifen | int(0) <= 1349)) %}
+              {% if doc.estado == 'rechazado' and doc.data_json and (doc.codigo_sifen == '0420' or (doc.codigo_sifen and doc.codigo_sifen | int(0) >= 1300)) %}
               <button class="btn btn-outline-warning btn-sm ms-1"
                       title="Corregir receptor y reenviar"
                       data-bs-toggle="modal"

@@ -271,7 +271,7 @@ def _es_error_receptor(codigo: str) -> bool:
     if codigo == '0420':
         return True
     try:
-        return 1300 <= int(codigo) <= 1349
+        return int(codigo) >= 1300
     except (ValueError, TypeError):
         return False
 
