@@ -381,11 +381,16 @@ class XMLSigner:
         hash_input = params + csc_val
         c_hash_qr  = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
 
-        logger.warning(
-            "QR params | CDC=%s | dFeEmiDE=%s | dRucRec=%r | dTotGralOpe=%s"
-            " | dTotIVA=%s | cItems=%s | DigestValue=%s... | IdCSC=%s",
-            cdc[:20], _txt('dFeEmiDE'), ruc_rec, tot_gral, tot_iva,
-            c_items, digest_hex[:20], csc_id
+        print(
+            f"[QR-DEBUG] CDC={cdc[:20]}"
+            f" | dFeEmiDE={_txt('dFeEmiDE')!r}"
+            f" | dRucRec={ruc_rec!r}"
+            f" | dTotGralOpe={tot_gral}"
+            f" | dTotIVA={tot_iva}"
+            f" | cItems={c_items}"
+            f" | DigestValue={digest_hex[:20]}..."
+            f" | IdCSC={csc_id}",
+            flush=True
         )
 
         return url_base + params + f"&cHashQR={c_hash_qr}"
