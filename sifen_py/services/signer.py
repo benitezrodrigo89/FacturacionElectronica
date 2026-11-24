@@ -356,7 +356,7 @@ class XMLSigner:
         )
 
         fe_emi_hex     = _to_hex(_txt('dFeEmiDE'))
-        ruc_rec        = _txt('dRucRec') or '0'
+        ruc_rec        = _txt('dRucRec') or _txt('dNumIDRec') or '0'
         tot_gral       = _txt('dTotGralOpe') or '0'
         tot_iva        = _txt('dTotIVA') or '0'
         # Contar ítems: cantidad de elementos dCodInt (uno por ítem)
