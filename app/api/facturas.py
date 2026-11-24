@@ -279,12 +279,15 @@ def _es_error_receptor(codigo: str) -> bool:
 @router.post('/documentos/{cdc}/corregir-receptor',
              summary="Corregir datos del receptor en un documento rechazado")
 async def corregir_receptor(
-    cdc:          str,
-    ruc:          str,
-    razon_social: str,
-    direccion:    str = '',
-    telefono:     str = '',
-    email:        str = '',
+    cdc:              str,
+    razon_social:     str,
+    contribuyente:    str = 'true',
+    ruc:              str = '',
+    documento_tipo:   int = None,
+    documento_numero: str = '',
+    direccion:        str = '',
+    telefono:         str = '',
+    email:            str = '',
     _key: str = Depends(require_api_key),
 ):
     """
@@ -292,15 +295,26 @@ async def corregir_receptor(
     1300-1349 (errores en datos del receptor). Como ningún dato del receptor
     forma parte del CDC, se reutiliza el mismo número de documento y CDC.
     El documento vuelve a estado 'pendiente' para ser reenviado por el daemon.
+    Soporta contribuyentes (ruc) y no contribuyentes (documento_tipo/numero).
     """
     import json as _json
     if len(cdc) != 44:
         raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
 
-    ruc          = ruc.strip()
-    razon_social = razon_social.strip()
-    if not ruc or not razon_social:
-        raise HTTPException(status_code=400, detail="RUC y razón social son requeridos")
+    es_contribuyente = contribuyente.lower() != 'false'
+    razon_social     = razon_social.strip()
+
+    if es_contribuyente:
+        ruc = ruc.strip()
+        if not ruc:
+            raise HTTPException(status_code=400, detail="ruc es requerido cuando contribuyente=true")
+        if not razon_social:
+            raise HTTPException(status_code=400, detail="razon_social es requerida")
+    else:
+        if documento_tipo is None:
+            raise HTTPException(status_code=400, detail="documento_tipo es requerido cuando contribuyente=false")
+        if documento_tipo != 5 and not documento_numero.strip():
+            raise HTTPException(status_code=400, detail="documento_numero es requerido para el tipo de documento indicado")
 
     # 1. Cargar documento
     db = Conexion()
@@ -337,19 +351,39 @@ async def corregir_receptor(
     # 2. Parchear data con el nuevo receptor
     try:
         data = _json.loads(data_json_raw)
-        doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
-        data['cliente']['ruc']             = ruc
-        data['cliente']['razonSocial']     = razon_social
-        data['cliente']['documentoNumero'] = doc_numero
+        if es_contribuyente:
+            doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
+            data['cliente']['contribuyente']     = True
+            data['cliente']['tipoOperacion']     = 1
+            data['cliente']['ruc']               = ruc
+            data['cliente']['razonSocial']       = razon_social
+            data['cliente']['tipoContribuyente'] = data['cliente'].get('tipoContribuyente', 2)
+            data['cliente']['documentoTipo']     = 1
+            data['cliente']['documentoNumero']   = doc_numero
+            if 'usuario' in data:
+                data['usuario']['documentoTipo']   = 1
+                data['usuario']['documentoNumero'] = doc_numero
+                data['usuario']['nombre']          = razon_social
+        else:
+            doc_num      = '0' if documento_tipo == 5 else documento_numero.strip()
+            razon_final  = 'Sin Nombre' if documento_tipo == 5 else razon_social
+            data['cliente']['contribuyente']   = False
+            data['cliente']['tipoOperacion']   = 2
+            data['cliente']['documentoTipo']   = documento_tipo
+            data['cliente']['documentoNumero'] = doc_num
+            data['cliente']['razonSocial']     = razon_final
+            data['cliente'].pop('ruc', None)
+            data['cliente'].pop('tipoContribuyente', None)
+            if 'usuario' in data:
+                data['usuario']['documentoTipo']   = documento_tipo
+                data['usuario']['documentoNumero'] = doc_num
+                data['usuario']['nombre']          = razon_final
         if direccion.strip():
-            data['cliente']['direccion']   = direccion.strip()
+            data['cliente']['direccion'] = direccion.strip()
         if telefono.strip():
-            data['cliente']['telefono']    = telefono.strip()
+            data['cliente']['telefono']  = telefono.strip()
         if email.strip():
-            data['cliente']['email']       = email.strip()
-        if 'usuario' in data:
-            data['usuario']['nombre']          = razon_social
-            data['usuario']['documentoNumero'] = doc_numero
+            data['cliente']['email']     = email.strip()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error procesando datos del documento: {e}")
 
@@ -382,11 +416,13 @@ async def corregir_receptor(
         db = Conexion()
         db.conectar()
         repo = RepositorioDE(db)
+        ruc_bd = ruc if es_contribuyente else (documento_numero.strip() or '0')
+        razon_bd = razon_social if es_contribuyente else ('Sin Nombre' if documento_tipo == 5 else razon_social)
         ok = repo.corregir_receptor(
             cdc=cdc,
             xml_firmado=xml_firmado,
-            ruc_receptor=ruc,
-            razon_social_receptor=razon_social,
+            ruc_receptor=ruc_bd,
+            razon_social_receptor=razon_bd,
             data_json_str=_json.dumps(data, ensure_ascii=False),
         )
         db.cerrar()

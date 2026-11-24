@@ -101,16 +101,45 @@
         </p>
         <div class="alert alert-info small py-2 mb-3">
           <i class="bi bi-info-circle me-1"></i>
-          El RUC del receptor no forma parte del CDC — podés corregirlo y reenviar con el mismo número de documento.
+          Los datos del receptor no forman parte del CDC — podés corregirlos y reenviar con el mismo número de documento.
+        </div>
+        <!-- Toggle contribuyente -->
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="corregir-contribuyente" checked
+                   onchange="toggleCorregirContribuyente()">
+            <label class="form-check-label fw-semibold" for="corregir-contribuyente">
+              Tiene RUC <span class="text-muted small">(contribuyente)</span>
+            </label>
+          </div>
         </div>
         <div class="row g-3">
-          <div class="col-md-5">
+          <!-- Panel RUC -->
+          <div class="col-md-5" id="corregir-panel-ruc">
             <label class="form-label fw-semibold">RUC <span class="text-danger">*</span></label>
             <input type="text" id="corregir-ruc" class="form-control" placeholder="1234567-8">
             <div id="corregir-ruc-feedback" class="form-text mt-1"></div>
           </div>
-          <div class="col-md-7">
-            <label class="form-label fw-semibold">Razón Social <span class="text-danger">*</span></label>
+          <!-- Panel no-RUC -->
+          <div class="col-md-4" id="corregir-panel-nodoc" style="display:none">
+            <label class="form-label fw-semibold">Tipo Documento <span class="text-danger">*</span></label>
+            <select id="corregir-doc-tipo" class="form-select" onchange="toggleCorregirInnominado()">
+              <option value="1">Cédula paraguaya</option>
+              <option value="2">Pasaporte</option>
+              <option value="3">Cédula extranjera</option>
+              <option value="4">Carnet de residencia</option>
+              <option value="5">Innominado</option>
+              <option value="6">Tarjeta Diplomática</option>
+              <option value="9">No especificado</option>
+            </select>
+          </div>
+          <div class="col-md-3" id="corregir-col-docnum" style="display:none">
+            <label class="form-label fw-semibold">N° Documento <span class="text-danger">*</span></label>
+            <input type="text" id="corregir-doc-numero" class="form-control" placeholder="Nro. documento">
+          </div>
+          <!-- Razón social (siempre visible) -->
+          <div class="col-md-7" id="corregir-col-razon">
+            <label class="form-label fw-semibold">Razón Social / Nombre <span id="corregir-razon-required" class="text-danger">*</span></label>
             <input type="text" id="corregir-razon" class="form-control">
           </div>
           <div class="col-12">
@@ -242,16 +271,59 @@ function setActive(btn) {
   filtrar(btn);
 }
 
+function toggleCorregirContribuyente() {
+  const esContrib = document.getElementById('corregir-contribuyente').checked;
+  document.getElementById('corregir-panel-ruc').style.display    = esContrib ? '' : 'none';
+  document.getElementById('corregir-panel-nodoc').style.display  = esContrib ? 'none' : '';
+  document.getElementById('corregir-col-docnum').style.display   = esContrib ? 'none' : '';
+  if (!esContrib) {
+    document.getElementById('corregir-ruc').value = '';
+    toggleCorregirInnominado();
+  }
+}
+
+function toggleCorregirInnominado() {
+  const tipo   = parseInt(document.getElementById('corregir-doc-tipo').value);
+  const colNum = document.getElementById('corregir-col-docnum');
+  const razonEl = document.getElementById('corregir-razon');
+  const req     = document.getElementById('corregir-razon-required');
+  if (tipo === 5) {
+    colNum.style.display = 'none';
+    document.getElementById('corregir-doc-numero').value = '0';
+    razonEl.value    = 'Sin Nombre';
+    razonEl.readOnly = true;
+    if (req) req.style.display = 'none';
+  } else {
+    colNum.style.display = '';
+    if (razonEl.value === 'Sin Nombre') razonEl.value = '';
+    razonEl.readOnly = false;
+    if (req) req.style.display = '';
+  }
+}
+
 function prepararCorreccion(btn) {
+  const rucRec  = btn.dataset.ruc || '';
+  const esContrib = rucRec.includes('-');
   document.getElementById('corregir-cdc').textContent    = btn.dataset.cdc;
   document.getElementById('corregir-numero').textContent = btn.dataset.numero;
-  document.getElementById('corregir-ruc').value          = btn.dataset.ruc       || '';
-  document.getElementById('corregir-razon').value        = btn.dataset.razon     || '';
-  document.getElementById('corregir-direccion').value    = btn.dataset.direccion || '';
-  document.getElementById('corregir-telefono').value     = btn.dataset.telefono  || '';
-  document.getElementById('corregir-email').value        = btn.dataset.email     || '';
+  document.getElementById('corregir-razon').value        = btn.dataset.razon || '';
+  document.getElementById('corregir-direccion').value    = '';
+  document.getElementById('corregir-telefono').value     = '';
+  document.getElementById('corregir-email').value        = '';
   document.getElementById('corregir-ruc-feedback').innerHTML = '';
   document.getElementById('corregir-resultado').className = 'd-none';
+  document.getElementById('corregir-contribuyente').checked = esContrib;
+  toggleCorregirContribuyente();
+  if (esContrib) {
+    document.getElementById('corregir-ruc').value = rucRec;
+  } else {
+    const docNum = (rucRec && rucRec !== '0') ? rucRec : '';
+    document.getElementById('corregir-doc-numero').value = docNum;
+    if (!docNum) {
+      document.getElementById('corregir-doc-tipo').value = '5';
+      toggleCorregirInnominado();
+    }
+  }
 }
 
 document.addEventListener('shown.bs.modal', function(e) {
@@ -263,6 +335,7 @@ document.addEventListener('shown.bs.modal', function(e) {
 
   rucEl.addEventListener('blur', async function handler() {
     rucEl.removeEventListener('blur', handler);
+    if (!document.getElementById('corregir-contribuyente').checked) return;
     const ruc = rucEl.value.trim();
     feedbackEl.innerHTML = '';
     if (!ruc || ruc.length < 3) return;
@@ -285,13 +358,33 @@ document.addEventListener('shown.bs.modal', function(e) {
 });
 
 async function confirmarCorreccion() {
-  const cdc    = document.getElementById('corregir-cdc').textContent.trim();
-  const ruc    = document.getElementById('corregir-ruc').value.trim();
-  const razon  = document.getElementById('corregir-razon').value.trim();
-  const res    = document.getElementById('corregir-resultado');
+  const cdc       = document.getElementById('corregir-cdc').textContent.trim();
+  const esContrib = document.getElementById('corregir-contribuyente').checked;
+  const razon     = document.getElementById('corregir-razon').value.trim();
+  const res       = document.getElementById('corregir-resultado');
 
-  if (!ruc)   { alert('El RUC es obligatorio.'); return; }
-  if (!razon) { alert('La razón social es obligatoria.'); return; }
+  let queryData = {
+    contribuyente: esContrib ? 'true' : 'false',
+    razon_social:  razon,
+    direccion: document.getElementById('corregir-direccion').value.trim(),
+    telefono:  document.getElementById('corregir-telefono').value.trim(),
+    email:     document.getElementById('corregir-email').value.trim(),
+  };
+
+  if (esContrib) {
+    const ruc = document.getElementById('corregir-ruc').value.trim();
+    if (!ruc)   { alert('El RUC es obligatorio.'); return; }
+    if (!razon) { alert('La razón social es obligatoria.'); return; }
+    queryData.ruc = ruc;
+  } else {
+    const tipo   = document.getElementById('corregir-doc-tipo').value;
+    const docNum = tipo === '5' ? '0' : document.getElementById('corregir-doc-numero').value.trim();
+    if (tipo !== '5' && !docNum)  { alert('El número de documento es obligatorio.'); return; }
+    if (tipo !== '5' && !razon)   { alert('El nombre del cliente es obligatorio.'); return; }
+    queryData.documento_tipo   = tipo;
+    queryData.documento_numero = docNum;
+    if (tipo === '5') queryData.razon_social = 'Sin Nombre';
+  }
 
   const spinner = document.getElementById('corregir-spinner');
   const btn     = document.getElementById('btn-confirmar-corregir');
@@ -299,13 +392,7 @@ async function confirmarCorreccion() {
   btn.disabled = true;
 
   try {
-    const params = new URLSearchParams({
-      ruc,
-      razon_social: razon,
-      direccion: document.getElementById('corregir-direccion').value.trim(),
-      telefono:  document.getElementById('corregir-telefono').value.trim(),
-      email:     document.getElementById('corregir-email').value.trim(),
-    });
+    const params = new URLSearchParams(queryData);
     const resp = await fetch(`/api/v1/documentos/${cdc}/corregir-receptor?${params}`, {
       method: 'POST',
       headers: { 'X-API-Key': document.getElementById('api-key').value },
