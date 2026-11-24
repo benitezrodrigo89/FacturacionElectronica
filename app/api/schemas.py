@@ -133,7 +133,10 @@ class ReceptorRequest(BaseModel):
         nombre = "Sin Nombre" if doc_tipo == 5 else self.razon_social
         # gRespDE no acepta tipo 5 (Innominado) — usar 9 (No especificado) como fallback
         tipo_usuario = 9 if doc_tipo == 5 else doc_tipo
-        return {"documentoTipo": tipo_usuario, "documentoNumero": doc_numero, "nombre": nombre, "cargo": "Cliente"}
+        bloque = {"documentoTipo": tipo_usuario, "documentoNumero": doc_numero, "nombre": nombre, "cargo": "Cliente"}
+        if tipo_usuario == 9:
+            bloque["documentoTipoDescripcion"] = "No especificado"
+        return bloque
 
 
 class CuotaRequest(BaseModel):

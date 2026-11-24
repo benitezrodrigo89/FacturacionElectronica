@@ -376,9 +376,12 @@ async def corregir_receptor(
             data['cliente'].pop('tipoContribuyente', None)
             if 'usuario' in data:
                 # gRespDE no acepta tipo 5 (Innominado) — usar 9 como fallback
-                data['usuario']['documentoTipo']   = 9 if documento_tipo == 5 else documento_tipo
+                tipo_usuario = 9 if documento_tipo == 5 else documento_tipo
+                data['usuario']['documentoTipo']   = tipo_usuario
                 data['usuario']['documentoNumero'] = doc_num
                 data['usuario']['nombre']          = razon_final
+                if tipo_usuario == 9:
+                    data['usuario']['documentoTipoDescripcion'] = 'No especificado'
         if direccion.strip():
             data['cliente']['direccion'] = direccion.strip()
         if telefono.strip():
