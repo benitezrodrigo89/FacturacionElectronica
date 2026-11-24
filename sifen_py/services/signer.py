@@ -356,7 +356,8 @@ class XMLSigner:
         )
 
         fe_emi_hex     = _to_hex(_txt('dFeEmiDE'))
-        ruc_rec        = _txt('dRucRec') or ''
+        # Contribuyente: usa dRucRec del XML. No contribuyente: usa dNumIDRec (ej: '0' para innominado)
+        ruc_rec        = _txt('dRucRec') or _txt('dNumIDRec') or '0'
         tot_gral       = _txt('dTotGralOpe') or '0'
         tot_iva        = _txt('dTotIVA') or '0'
         # Contar ítems: cantidad de elementos dCodInt (uno por ítem)
@@ -365,14 +366,11 @@ class XMLSigner:
         csc_id         = getattr(self.config, 'csc_id', '0001')
         csc_val        = getattr(self.config, 'csc', '')
 
-        # dRucRec solo se incluye cuando hay RUC (contribuyente).
-        # Para no contribuyentes SIFEN omite el parámetro del cálculo del hash.
-        ruc_param = f"&dRucRec={ruc_rec}" if ruc_rec else ""
         params = (
             f"nVersion=150"
             f"&Id={cdc}"
             f"&dFeEmiDE={fe_emi_hex}"
-            f"{ruc_param}"
+            f"&dRucRec={ruc_rec}"
             f"&dTotGralOpe={tot_gral}"
             f"&dTotIVA={tot_iva}"
             f"&cItems={c_items}"
