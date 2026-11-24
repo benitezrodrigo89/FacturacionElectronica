@@ -150,6 +150,14 @@ class XMLSigner:
                 raise SignatureException("No se encontró el elemento <DE> ni <rEve> en el XML")
             cdc = de_elem.get('Id', '')
 
+            # DEBUG: imprimir sección gDatRec para comparar innominado vs contribuyente
+            sifen_ns_dbg = "http://ekuatia.set.gov.py/sifen/xsd"
+            gdat = de_elem.find('.//{%s}gDatRec' % sifen_ns_dbg)
+            if gdat is not None:
+                import re as _re
+                gdat_str = _re.sub(r'\s+', ' ', etree.tostring(gdat, encoding='unicode'))
+                print(f"[gDatRec] {gdat_str[:400]}", flush=True)
+
             # ── 2. DigestValue sobre <DE> con C14N exclusivo ─────────────────
             # Transforms declarados: enveloped-signature (no-op) + exc-C14N
             de_c14n = etree.tostring(de_elem, method='c14n', exclusive=True)
