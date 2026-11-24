@@ -9,20 +9,22 @@ class RepositorioClientes:
     def __init__(self, db: Conexion):
         self.db = db
 
+    _COLS = "id, ruc, razon_social, direccion, telefono, email, activo, contribuyente, documento_tipo, documento_numero"
+
     def listar(self, busqueda: str = '', solo_activos: bool = True) -> list:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             filtro_activo = "AND activo = TRUE" if solo_activos else ""
             if busqueda:
                 cur.execute(f"""
-                    SELECT id, ruc, razon_social, direccion, telefono, email, activo
+                    SELECT {self._COLS}
                     FROM clientes_sifen
-                    WHERE (razon_social ILIKE %s OR ruc ILIKE %s) {filtro_activo}
+                    WHERE (razon_social ILIKE %s OR ruc ILIKE %s OR documento_numero ILIKE %s) {filtro_activo}
                     ORDER BY razon_social LIMIT 50
-                """, (f'%{busqueda}%', f'%{busqueda}%'))
+                """, (f'%{busqueda}%', f'%{busqueda}%', f'%{busqueda}%'))
             else:
                 cur.execute(f"""
-                    SELECT id, ruc, razon_social, direccion, telefono, email, activo
+                    SELECT {self._COLS}
                     FROM clientes_sifen
                     WHERE 1=1 {filtro_activo}
                     ORDER BY razon_social LIMIT 200
@@ -33,8 +35,7 @@ class RepositorioClientes:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, ruc, razon_social, direccion, telefono, email, activo "
-                "FROM clientes_sifen WHERE id = %s", (cliente_id,)
+                f"SELECT {self._COLS} FROM clientes_sifen WHERE id = %s", (cliente_id,)
             )
             return cur.fetchone()
 
@@ -42,40 +43,49 @@ class RepositorioClientes:
         conn = self.db.conectar()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, ruc, razon_social, direccion, telefono, email, activo "
-                "FROM clientes_sifen WHERE UPPER(ruc) = UPPER(%s) LIMIT 1", (ruc.strip(),)
+                f"SELECT {self._COLS} FROM clientes_sifen WHERE UPPER(ruc) = UPPER(%s) LIMIT 1",
+                (ruc.strip(),)
             )
             return cur.fetchone()
 
     def autoguardar(self, ruc: str, razon_social: str, direccion: str = '',
                     telefono: str = '', email: str = '') -> int:
-        """Crea el cliente si no existe. Devuelve el id (nuevo o existente)."""
+        """Crea el cliente contribuyente si no existe. Devuelve el id."""
         existente = self.obtener_por_ruc(ruc)
         if existente:
             return dict(existente)['id']
-        return self.crear(ruc=ruc, razon_social=razon_social,
+        return self.crear(contribuyente=True, ruc=ruc, razon_social=razon_social,
                           direccion=direccion, telefono=telefono, email=email)
 
-    def crear(self, ruc: str, razon_social: str, direccion: str = '',
-              telefono: str = '', email: str = '') -> int:
+    def crear(self, razon_social: str, contribuyente: bool = True,
+              ruc: str = '', documento_tipo: int = None, documento_numero: str = '',
+              direccion: str = '', telefono: str = '', email: str = '') -> int:
         conn = self.db.conectar()
+        ruc_val = ruc.strip() if ruc and ruc.strip() else None
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO clientes_sifen (ruc, razon_social, direccion, telefono, email)
-                VALUES (%s, %s, %s, %s, %s) RETURNING id
-            """, (ruc.strip(), razon_social.strip(), direccion, telefono, email))
+                INSERT INTO clientes_sifen
+                    (ruc, razon_social, direccion, telefono, email,
+                     contribuyente, documento_tipo, documento_numero)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+            """, (ruc_val, razon_social.strip(), direccion, telefono, email,
+                  contribuyente, documento_tipo, documento_numero or None))
             conn.commit()
             return cur.fetchone()['id']
 
-    def actualizar(self, cliente_id: int, ruc: str, razon_social: str,
+    def actualizar(self, cliente_id: int, razon_social: str, contribuyente: bool = True,
+                   ruc: str = '', documento_tipo: int = None, documento_numero: str = '',
                    direccion: str = '', telefono: str = '', email: str = '') -> bool:
         conn = self.db.conectar()
+        ruc_val = ruc.strip() if ruc and ruc.strip() else None
         with conn.cursor() as cur:
             cur.execute("""
-                UPDATE clientes_sifen SET ruc=%s, razon_social=%s, direccion=%s,
-                                    telefono=%s, email=%s
+                UPDATE clientes_sifen
+                SET ruc=%s, razon_social=%s, direccion=%s, telefono=%s, email=%s,
+                    contribuyente=%s, documento_tipo=%s, documento_numero=%s
                 WHERE id=%s
-            """, (ruc.strip(), razon_social.strip(), direccion, telefono, email, cliente_id))
+            """, (ruc_val, razon_social.strip(), direccion, telefono, email,
+                  contribuyente, documento_tipo, documento_numero or None, cliente_id))
             conn.commit()
             return cur.rowcount > 0
 

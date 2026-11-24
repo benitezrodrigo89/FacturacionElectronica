@@ -8,27 +8,7 @@
 </div>
 
 <!-- Receptor -->
-<div class="card mb-3">
-  <div class="card-header fw-semibold py-2 bg-primary text-white">
-    <i class="bi bi-person me-1"></i>Destinatario
-  </div>
-  <div class="card-body">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label">RUC <span class="text-danger">*</span></label>
-        <input type="text" id="ruc" class="form-control" placeholder="1234567-8" required>
-      </div>
-      <div class="col-md-8">
-        <label class="form-label">Razón Social <span class="text-danger">*</span></label>
-        <input type="text" id="razon_social" class="form-control" required>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Dirección</label>
-        <input type="text" id="direccion" class="form-control">
-      </div>
-    </div>
-  </div>
-</div>
+{% include 'emision/_receptor.html' %}
 
 <!-- Remisión -->
 <div class="card mb-3">
@@ -125,16 +105,15 @@
   <a href="/" class="btn btn-outline-secondary">Cancelar</a>
 </div>
 
-<script src="/static/emision.js?v=4"></script>
+<script src="/static/emision.js?v=5"></script>
 <script>
   addItem(false);
-  iniciarValidacionRuc();
+  initReceptor();
 
   function submitNRE() {
     const items = getItems(false);
     if (!items.length) { alert('Agregá al menos un ítem.'); return; }
-    if (!document.getElementById('ruc').value.trim()) { alert('El RUC es obligatorio.'); return; }
-    if (!document.getElementById('razon_social').value.trim()) { alert('La razón social es obligatoria.'); return; }
+    if (!validarReceptor()) return;
 
     const nombre = document.getElementById('transp-nombre').value.trim();
     const doc    = document.getElementById('transp-doc').value.trim();
@@ -142,11 +121,7 @@
     const marca  = document.getElementById('vehiculo-marca').value.trim();
 
     const payload = {
-      receptor: {
-        ruc:          document.getElementById('ruc').value.trim(),
-        razon_social: document.getElementById('razon_social').value.trim(),
-        direccion:    document.getElementById('direccion').value.trim() || null,
-      },
+      receptor: getReceptorPayload(),
       items: items.map(i => ({ descripcion: i.descripcion, cantidad: i.cantidad, codigo: i.codigo })),
       motivo:            parseInt(document.getElementById('motivo').value),
       descripcion:       document.getElementById('descripcion').value.trim() || null,

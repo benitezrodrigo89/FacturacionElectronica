@@ -31,6 +31,22 @@ MIGRACIONES = [
     ON documentos_electronicos (estado, fecha_envio)
     WHERE estado = 'en_lote';
     """,
+    # v4: soporte clientes sin RUC (no contribuyentes)
+    """
+    ALTER TABLE clientes_sifen ALTER COLUMN ruc DROP NOT NULL;
+    """,
+    """
+    ALTER TABLE clientes_sifen
+      ADD COLUMN IF NOT EXISTS contribuyente    BOOLEAN      NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS documento_tipo   INTEGER,
+      ADD COLUMN IF NOT EXISTS documento_numero VARCHAR(50);
+    """,
+    """
+    DROP INDEX IF EXISTS idx_clientes_sifen_ruc;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_sifen_ruc
+      ON clientes_sifen (ruc)
+      WHERE activo = TRUE AND ruc IS NOT NULL;
+    """,
 ]
 
 def main():

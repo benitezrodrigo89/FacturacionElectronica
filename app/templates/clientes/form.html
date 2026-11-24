@@ -10,14 +10,52 @@
       <div class="card-body">
         <form method="post"
               action="{% if cliente %}/clientes/{{ cliente.id }}/editar{% else %}/clientes{% endif %}">
+
+          <!-- Hidden + checkbox trick para bool en HTML form -->
+          <input type="hidden" name="contribuyente" value="false">
           <div class="mb-3">
-            <label class="form-label fw-semibold">RUC <span class="text-danger">*</span></label>
-            <input type="text" name="ruc" class="form-control"
-                   value="{{ cliente.ruc if cliente else '' }}"
-                   placeholder="12345678-9" required>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="contribuyente" id="form-contribuyente"
+                     value="true" {% if not cliente or cliente.contribuyente %}checked{% endif %}
+                     onchange="toggleFormContribuyente()">
+              <label class="form-check-label fw-semibold" for="form-contribuyente">
+                Tiene RUC <span class="text-muted small">(contribuyente)</span>
+              </label>
+            </div>
           </div>
+
+          <!-- Panel RUC -->
+          <div class="mb-3" id="form-panel-ruc" {% if cliente and not cliente.contribuyente %}style="display:none"{% endif %}>
+            <label class="form-label fw-semibold">RUC</label>
+            <input type="text" name="ruc" class="form-control"
+                   value="{{ cliente.ruc if cliente and cliente.ruc else '' }}"
+                   placeholder="12345678-9">
+          </div>
+
+          <!-- Panel no-RUC -->
+          <div class="row g-3 mb-3" id="form-panel-nodoc" {% if not cliente or cliente.contribuyente %}style="display:none"{% endif %}>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tipo Documento</label>
+              <select name="documento_tipo" class="form-select" id="form-doc-tipo" onchange="toggleFormInnominado()">
+                <option value="1" {% if cliente and cliente.documento_tipo == 1 %}selected{% endif %}>Cédula paraguaya</option>
+                <option value="2" {% if cliente and cliente.documento_tipo == 2 %}selected{% endif %}>Pasaporte</option>
+                <option value="3" {% if cliente and cliente.documento_tipo == 3 %}selected{% endif %}>Cédula extranjera</option>
+                <option value="4" {% if cliente and cliente.documento_tipo == 4 %}selected{% endif %}>Carnet de residencia</option>
+                <option value="5" {% if cliente and cliente.documento_tipo == 5 %}selected{% endif %}>Innominado</option>
+                <option value="6" {% if cliente and cliente.documento_tipo == 6 %}selected{% endif %}>Tarjeta Diplomática</option>
+                <option value="9" {% if cliente and cliente.documento_tipo == 9 %}selected{% endif %}>No especificado</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="form-col-docnum" {% if cliente and cliente.documento_tipo == 5 %}style="display:none"{% endif %}>
+              <label class="form-label fw-semibold">N° Documento</label>
+              <input type="text" name="documento_numero" class="form-control"
+                     value="{{ cliente.documento_numero if cliente and cliente.documento_numero else '' }}"
+                     placeholder="Número de CI, pasaporte, etc.">
+            </div>
+          </div>
+
           <div class="mb-3">
-            <label class="form-label fw-semibold">Razón Social <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold">Razón Social / Nombre <span class="text-danger">*</span></label>
             <input type="text" name="razon_social" class="form-control"
                    value="{{ cliente.razon_social if cliente else '' }}" required>
           </div>
@@ -49,4 +87,16 @@
     </div>
   </div>
 </div>
+<script>
+function toggleFormContribuyente() {
+  const esContrib = document.getElementById('form-contribuyente').checked;
+  document.getElementById('form-panel-ruc').style.display   = esContrib ? '' : 'none';
+  document.getElementById('form-panel-nodoc').style.display = esContrib ? 'none' : '';
+  if (!esContrib) toggleFormInnominado();
+}
+function toggleFormInnominado() {
+  const tipo = parseInt(document.getElementById('form-doc-tipo').value);
+  document.getElementById('form-col-docnum').style.display = tipo === 5 ? 'none' : '';
+}
+</script>
 {% endblock %}

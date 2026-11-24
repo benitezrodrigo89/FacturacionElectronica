@@ -187,6 +187,132 @@ async function enviarAPI(endpoint, payload) {
   }
 }
 
+// ── Receptor contribuyente / no contribuyente ─────────────────────────────────
+
+function toggleContribuyente() {
+  const esContrib = document.getElementById('es-contribuyente').checked;
+  document.getElementById('panel-ruc').style.display      = esContrib ? '' : 'none';
+  document.getElementById('panel-no-ruc').style.display   = esContrib ? 'none' : '';
+  document.getElementById('col-doc-numero').style.display = esContrib ? 'none' : '';
+  if (!esContrib) {
+    document.getElementById('ruc').value = '';
+    toggleInnominado();
+  }
+}
+
+function toggleInnominado() {
+  const tipo    = parseInt(document.getElementById('documento_tipo').value);
+  const colNum  = document.getElementById('col-doc-numero');
+  const razonEl = document.getElementById('razon_social');
+  const req     = document.getElementById('razon-required');
+  if (tipo === 5) {
+    colNum.style.display   = 'none';
+    document.getElementById('documento_numero').value = '0';
+    razonEl.value    = 'Sin Nombre';
+    razonEl.readOnly = true;
+    if (req) req.style.display = 'none';
+  } else {
+    colNum.style.display = '';
+    if (razonEl.value === 'Sin Nombre') razonEl.value = '';
+    razonEl.readOnly = false;
+    if (req) req.style.display = '';
+  }
+}
+
+function getReceptorPayload() {
+  const esContrib   = document.getElementById('es-contribuyente')?.checked ?? true;
+  const razonSocial = (document.getElementById('razon_social')?.value  || '').trim();
+  const direccion   = (document.getElementById('direccion')?.value     || '').trim() || null;
+  const telefono    = (document.getElementById('telefono')?.value      || '').trim() || null;
+  const email       = (document.getElementById('email')?.value         || '').trim() || null;
+  if (esContrib) {
+    return {
+      contribuyente: true,
+      ruc:          (document.getElementById('ruc')?.value || '').trim(),
+      razon_social: razonSocial,
+      direccion, telefono, email,
+    };
+  }
+  const tipo = parseInt(document.getElementById('documento_tipo')?.value || '1');
+  return {
+    contribuyente:    false,
+    documento_tipo:   tipo,
+    documento_numero: tipo === 5 ? '0' : (document.getElementById('documento_numero')?.value || '').trim(),
+    razon_social:     tipo === 5 ? 'Sin Nombre' : razonSocial,
+    direccion, telefono, email,
+  };
+}
+
+function validarReceptor() {
+  const esContrib = document.getElementById('es-contribuyente')?.checked ?? true;
+  if (esContrib) {
+    if (!(document.getElementById('ruc')?.value || '').trim()) {
+      alert('El RUC del receptor es obligatorio.');
+      return false;
+    }
+    if (!(document.getElementById('razon_social')?.value || '').trim()) {
+      alert('La razón social es obligatoria.');
+      return false;
+    }
+  } else {
+    const tipo = parseInt(document.getElementById('documento_tipo')?.value || '1');
+    if (tipo !== 5 && !(document.getElementById('documento_numero')?.value || '').trim()) {
+      alert('El número de documento es obligatorio.');
+      return false;
+    }
+    if (tipo !== 5 && !(document.getElementById('razon_social')?.value || '').trim()) {
+      alert('El nombre del cliente es obligatorio.');
+      return false;
+    }
+  }
+  return true;
+}
+
+function initReceptor() {
+  document.addEventListener('click', function(e) {
+    const item = e.target.closest('.cliente-resultado');
+    if (item) {
+      const esContrib = item.dataset.contribuyente !== 'false';
+      const toggle = document.getElementById('es-contribuyente');
+      if (toggle) { toggle.checked = esContrib; toggleContribuyente(); }
+
+      if (esContrib) {
+        const rucEl = document.getElementById('ruc');
+        if (rucEl) rucEl.value = item.dataset.ruc || '';
+      } else {
+        const tipoEl = document.getElementById('documento_tipo');
+        const numEl  = document.getElementById('documento_numero');
+        if (tipoEl) tipoEl.value = item.dataset.documentoTipo || '1';
+        if (numEl)  numEl.value  = item.dataset.documentoNumero || '';
+        toggleInnominado();
+      }
+      const razon = document.getElementById('razon_social');
+      if (razon && !razon.readOnly) razon.value = item.dataset.razon || '';
+      const dir = document.getElementById('direccion');
+      if (dir) dir.value = item.dataset.direccion || '';
+      const tel = document.getElementById('telefono');
+      if (tel) tel.value = item.dataset.telefono || '';
+      const mail = document.getElementById('email');
+      if (mail) mail.value = item.dataset.email || '';
+      const buscar = document.getElementById('buscar-cliente');
+      if (buscar) buscar.value = '';
+      const res = document.getElementById('resultados-cliente');
+      if (res) res.innerHTML = '';
+
+      if (esContrib && typeof buscarFacturasPorRuc === 'function') {
+        buscarFacturasPorRuc(item.dataset.ruc || '');
+      }
+      return;
+    }
+    if (!e.target.closest('#buscar-cliente') && !e.target.closest('#resultados-cliente')) {
+      const r = document.getElementById('resultados-cliente');
+      if (r) r.innerHTML = '';
+    }
+  });
+
+  iniciarValidacionRuc();
+}
+
 // ── Validación de RUC en SIFEN ────────────────────────────────────────────────
 function iniciarValidacionRuc() {
   const rucEl   = document.getElementById('ruc');
@@ -198,6 +324,7 @@ function iniciarValidacionRuc() {
   rucEl.parentNode.insertBefore(feedbackEl, rucEl.nextSibling);
 
   rucEl.addEventListener('blur', async function() {
+    if (!document.getElementById('es-contribuyente')?.checked) return;
     const ruc = rucEl.value.trim();
     feedbackEl.innerHTML = '';
     if (!ruc || ruc.length < 3) return;

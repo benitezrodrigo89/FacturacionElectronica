@@ -50,15 +50,20 @@ async def form_editar_cliente(request: Request, cliente_id: int):
 @router.post('/clientes', response_class=HTMLResponse)
 async def crear_cliente(
     request: Request,
-    ruc: str = Form(...),
+    contribuyente: str = Form('true'),
+    ruc: str = Form(''),
+    documento_tipo: Optional[int] = Form(None),
+    documento_numero: str = Form(''),
     razon_social: str = Form(...),
     direccion: str = Form(''),
     telefono: str = Form(''),
     email: str = Form(''),
 ):
+    contrib_bool = contribuyente.lower() == 'true'
     db, repo = _db_repo()
     try:
-        repo.crear(ruc=ruc, razon_social=razon_social,
+        repo.crear(contribuyente=contrib_bool, ruc=ruc, documento_tipo=documento_tipo,
+                   documento_numero=documento_numero, razon_social=razon_social,
                    direccion=direccion, telefono=telefono, email=email)
     finally:
         db.cerrar()
@@ -70,16 +75,22 @@ async def crear_cliente(
 async def actualizar_cliente(
     request: Request,
     cliente_id: int,
-    ruc: str = Form(...),
+    contribuyente: str = Form('true'),
+    ruc: str = Form(''),
+    documento_tipo: Optional[int] = Form(None),
+    documento_numero: str = Form(''),
     razon_social: str = Form(...),
     direccion: str = Form(''),
     telefono: str = Form(''),
     email: str = Form(''),
 ):
+    contrib_bool = contribuyente.lower() == 'true'
     db, repo = _db_repo()
     try:
-        repo.actualizar(cliente_id, ruc=ruc, razon_social=razon_social,
-                        direccion=direccion, telefono=telefono, email=email)
+        repo.actualizar(cliente_id, contribuyente=contrib_bool, ruc=ruc,
+                        documento_tipo=documento_tipo, documento_numero=documento_numero,
+                        razon_social=razon_social, direccion=direccion,
+                        telefono=telefono, email=email)
     finally:
         db.cerrar()
     from fastapi.responses import RedirectResponse
@@ -108,7 +119,7 @@ async def autoguardar_cliente(
     telefono: str = Form(''),
     email: str = Form(''),
 ):
-    """Guarda el cliente si no existe. Llamado automáticamente al emitir una FE/NCE."""
+    """Guarda el cliente contribuyente si no existe. Solo se llama para contribuyentes."""
     if not ruc or not razon_social:
         return {'guardado': False}
     db, repo = _db_repo()

@@ -42,8 +42,6 @@ MOTIVOS_NCE = {
 def _build_data_nce(req: NotaCreditoRequest, numero_doc: int, cfg: dict) -> dict:
     total      = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
     monto_pago = req.condicion_pago.monto or total
-    ruc        = req.receptor.ruc.strip()
-    doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
     es_prueba  = cfg.get('ambiente') == 'test'
     codigo_seg = str(random.randint(100_000_000, 999_999_999))
 
@@ -63,33 +61,8 @@ def _build_data_nce(req: NotaCreditoRequest, numero_doc: int, cfg: dict) -> dict
         "notaCreditoDebito": {
             "motivo": int(req.motivo),
         },
-        "cliente": {
-            "contribuyente": True,
-            "ruc": ruc,
-            "razonSocial": req.receptor.razon_social,
-            "tipoOperacion": 1,
-            "direccion": req.receptor.direccion or "Sin especificar",
-            "numeroCasa": "0",
-            "departamento": 1,
-            "departamentoDescripcion": "ASUNCION",
-            "distrito": 1,
-            "distritoDescripcion": "ASUNCION (DISTRITO)",
-            "ciudad": 1,
-            "ciudadDescripcion": "ASUNCION (DISTRITO)",
-            "pais": "PRY",
-            "paisDescripcion": "Paraguay",
-            "tipoContribuyente": 2,
-            "documentoTipo": 1,
-            "documentoNumero": doc_numero,
-            "telefono": req.receptor.telefono or "",
-            "email": req.receptor.email or "",
-        },
-        "usuario": {
-            "documentoTipo": 1,
-            "documentoNumero": doc_numero,
-            "nombre": req.receptor.razon_social,
-            "cargo": "Cliente",
-        },
+        "cliente": req.receptor.build_cliente_block(),
+        "usuario": req.receptor.build_usuario_block(),
         "condicion": _build_condicion(req.condicion_pago, monto_pago),
         "items": [
             {
@@ -231,7 +204,7 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
             numero_doc=numero_doc,
             tipo_documento=5,
             xml_firmado=xml_firmado,
-            ruc_receptor=req.receptor.ruc,
+            ruc_receptor=req.receptor.id_para_bd(),
             razon_social_receptor=req.receptor.razon_social,
             monto_total=total,
             data_documento={**data, 'timbrado': cfg['timbrado_numero']},
@@ -267,8 +240,6 @@ MOTIVOS_NRE = {
 
 
 def _build_data_nre(req: NotaRemisionRequest, numero_doc: int, cfg: dict) -> dict:
-    ruc        = req.receptor.ruc.strip()
-    doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
     codigo_seg = str(random.randint(100_000_000, 999_999_999))
     es_prueba  = cfg.get('ambiente') == 'test'
     motivo_str = MOTIVOS_NRE.get(int(req.motivo), 'Otros')
@@ -318,33 +289,8 @@ def _build_data_nre(req: NotaRemisionRequest, numero_doc: int, cfg: dict) -> dic
             "nombre": req.transportista.nombre if req.transportista else "Sin especificar",
             "matricula": req.transportista.vehiculo.matricula if (req.transportista and req.transportista.vehiculo) else "Sin matrícula",
         },
-        "cliente": {
-            "contribuyente": True,
-            "ruc": ruc,
-            "razonSocial": req.receptor.razon_social,
-            "tipoOperacion": 1,
-            "direccion": req.receptor.direccion or "Sin especificar",
-            "numeroCasa": "0",
-            "departamento": 1,
-            "departamentoDescripcion": "ASUNCION",
-            "distrito": 1,
-            "distritoDescripcion": "ASUNCION (DISTRITO)",
-            "ciudad": 1,
-            "ciudadDescripcion": "ASUNCION (DISTRITO)",
-            "pais": "PRY",
-            "paisDescripcion": "Paraguay",
-            "tipoContribuyente": 2,
-            "documentoTipo": 1,
-            "documentoNumero": doc_numero,
-            "telefono": req.receptor.telefono or "",
-            "email": req.receptor.email or "",
-        },
-        "usuario": {
-            "documentoTipo": 1,
-            "documentoNumero": doc_numero,
-            "nombre": req.receptor.razon_social,
-            "cargo": "Cliente",
-        },
+        "cliente": req.receptor.build_cliente_block(),
+        "usuario": req.receptor.build_usuario_block(),
         "transporte": transporte,
         "items": [
             {
@@ -430,8 +376,6 @@ MOTIVOS_NDE = MOTIVOS_NCE  # mismos códigos; el generador usa la misma lista
 def _build_data_nde(req: NotaDebitoRequest, numero_doc: int, cfg: dict) -> dict:
     total      = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
     monto_pago = req.condicion_pago.monto or total
-    ruc        = req.receptor.ruc.strip()
-    doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
     es_prueba  = cfg.get('ambiente') == 'test'
     codigo_seg = str(random.randint(100_000_000, 999_999_999))
 
@@ -451,33 +395,8 @@ def _build_data_nde(req: NotaDebitoRequest, numero_doc: int, cfg: dict) -> dict:
         "notaCreditoDebito": {
             "motivo": int(req.motivo),
         },
-        "cliente": {
-            "contribuyente": True,
-            "ruc": ruc,
-            "razonSocial": req.receptor.razon_social,
-            "tipoOperacion": 1,
-            "direccion": req.receptor.direccion or "Sin especificar",
-            "numeroCasa": "0",
-            "departamento": 1,
-            "departamentoDescripcion": "ASUNCION",
-            "distrito": 1,
-            "distritoDescripcion": "ASUNCION (DISTRITO)",
-            "ciudad": 1,
-            "ciudadDescripcion": "ASUNCION (DISTRITO)",
-            "pais": "PRY",
-            "paisDescripcion": "Paraguay",
-            "tipoContribuyente": 2,
-            "documentoTipo": 1,
-            "documentoNumero": doc_numero,
-            "telefono": req.receptor.telefono or "",
-            "email": req.receptor.email or "",
-        },
-        "usuario": {
-            "documentoTipo": 1,
-            "documentoNumero": doc_numero,
-            "nombre": req.receptor.razon_social,
-            "cargo": "Cliente",
-        },
+        "cliente": req.receptor.build_cliente_block(),
+        "usuario": req.receptor.build_usuario_block(),
         "condicion": _build_condicion(req.condicion_pago, monto_pago),
         "items": [
             {
@@ -543,7 +462,7 @@ async def emitir_nota_debito(req: NotaDebitoRequest, _key: str = Depends(require
         tipo_doc=6,
         cfg=cfg,
         sifen_config=sifen_config,
-        ruc_receptor=req.receptor.ruc,
+        ruc_receptor=req.receptor.id_para_bd(),
         razon_social_receptor=req.receptor.razon_social,
     )
 
@@ -712,6 +631,6 @@ async def emitir_nota_remision(req: NotaRemisionRequest, _key: str = Depends(req
         tipo_doc=7,
         cfg=cfg,
         sifen_config=sifen_config,
-        ruc_receptor=req.receptor.ruc,
+        ruc_receptor=req.receptor.id_para_bd(),
         razon_social_receptor=req.receptor.razon_social,
     )

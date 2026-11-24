@@ -90,18 +90,21 @@ CREATE TRIGGER trig_de_updated_at
 -- La API no valida contra esta tabla.
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS clientes_sifen (
-    id              SERIAL PRIMARY KEY,
-    ruc             VARCHAR(20) NOT NULL,
-    razon_social    VARCHAR(255) NOT NULL,
-    direccion       VARCHAR(255),
-    telefono        VARCHAR(50),
-    email           VARCHAR(100),
-    activo          BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id               SERIAL PRIMARY KEY,
+    ruc              VARCHAR(20),
+    razon_social     VARCHAR(255) NOT NULL,
+    direccion        VARCHAR(255),
+    telefono         VARCHAR(50),
+    email            VARCHAR(100),
+    activo           BOOLEAN NOT NULL DEFAULT TRUE,
+    contribuyente    BOOLEAN NOT NULL DEFAULT TRUE,
+    documento_tipo   INTEGER,
+    documento_numero VARCHAR(50),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_sifen_ruc ON clientes_sifen (ruc) WHERE activo = TRUE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_sifen_ruc ON clientes_sifen (ruc) WHERE activo = TRUE AND ruc IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_clientes_sifen_razon ON clientes_sifen (razon_social);
 
 DROP TRIGGER IF EXISTS trig_clientes_sifen_updated_at ON clientes_sifen;

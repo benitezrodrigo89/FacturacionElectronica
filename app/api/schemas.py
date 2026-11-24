@@ -1,5 +1,5 @@
 """Modelos Pydantic para la API de integración."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 from datetime import datetime
 from enum import IntEnum
@@ -33,11 +33,105 @@ class ItemRequest(BaseModel):
 
 
 class ReceptorRequest(BaseModel):
-    ruc: str = Field(description="RUC con dígito verificador, ej: 1234567-8")
-    razon_social: str
+    contribuyente: bool = Field(
+        default=True,
+        description="True si el receptor tiene RUC (contribuyente). False si es persona física o innominado.",
+    )
+    ruc: Optional[str] = Field(
+        default=None,
+        description="RUC con dígito verificador, ej: 1234567-8. Requerido cuando contribuyente=True.",
+    )
+    documento_tipo: Optional[int] = Field(
+        default=None,
+        description=(
+            "Tipo de documento del receptor — requerido cuando contribuyente=False. "
+            "1=Cédula paraguaya, 2=Pasaporte, 3=Cédula extranjera, "
+            "4=Carnet de residencia, 5=Innominado (venta al público sin identificación), "
+            "6=Tarjeta Diplomática, 9=No especificado"
+        ),
+    )
+    documento_numero: Optional[str] = Field(
+        default=None,
+        description="Número del documento. No requerido cuando documento_tipo=5 (innominado).",
+    )
+    razon_social: str = Field(
+        description="Razón social o nombre del receptor. Para innominado (tipo 5) se usa 'Sin Nombre'.",
+    )
     direccion: Optional[str] = None
     email: Optional[str] = None
     telefono: Optional[str] = None
+
+    @model_validator(mode='after')
+    def _validar(self):
+        if self.contribuyente:
+            if not self.ruc:
+                raise ValueError("ruc es requerido cuando contribuyente=True")
+        else:
+            if self.documento_tipo is None:
+                raise ValueError("documento_tipo es requerido cuando contribuyente=False")
+            if self.documento_tipo != 5 and not self.documento_numero:
+                raise ValueError(
+                    "documento_numero es requerido cuando contribuyente=False y documento_tipo != 5 (innominado)"
+                )
+        return self
+
+    def id_para_bd(self) -> str:
+        """Identificador del receptor para guardar en la columna ruc_receptor de BD."""
+        if self.contribuyente:
+            return self.ruc
+        return self.documento_numero or "0"
+
+    def build_cliente_block(self) -> dict:
+        """Bloque 'cliente' para el generador XML de SIFEN."""
+        base = {
+            "direccion": self.direccion or "Sin especificar",
+            "numeroCasa": "0",
+            "departamento": 1,
+            "departamentoDescripcion": "ASUNCION",
+            "distrito": 1,
+            "distritoDescripcion": "ASUNCION (DISTRITO)",
+            "ciudad": 1,
+            "ciudadDescripcion": "ASUNCION (DISTRITO)",
+            "pais": "PRY",
+            "paisDescripcion": "Paraguay",
+            "telefono": self.telefono or "",
+            "email": self.email or "",
+        }
+        if self.contribuyente:
+            ruc = self.ruc.strip()
+            doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
+            base.update({
+                "contribuyente": True,
+                "ruc": ruc,
+                "razonSocial": self.razon_social,
+                "tipoOperacion": 1,
+                "tipoContribuyente": 2,
+                "documentoTipo": 1,
+                "documentoNumero": doc_numero,
+            })
+        else:
+            doc_tipo = self.documento_tipo
+            doc_numero = "0" if doc_tipo == 5 else self.documento_numero
+            razon_social = "Sin Nombre" if doc_tipo == 5 else self.razon_social
+            base.update({
+                "contribuyente": False,
+                "documentoTipo": doc_tipo,
+                "documentoNumero": doc_numero,
+                "razonSocial": razon_social,
+                "tipoOperacion": 2,
+            })
+        return base
+
+    def build_usuario_block(self) -> dict:
+        """Bloque 'usuario' (gRespDE) para el generador XML de SIFEN."""
+        if self.contribuyente:
+            ruc = self.ruc.strip()
+            doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
+            return {"documentoTipo": 1, "documentoNumero": doc_numero, "nombre": self.razon_social, "cargo": "Cliente"}
+        doc_tipo = self.documento_tipo
+        doc_numero = "0" if doc_tipo == 5 else self.documento_numero
+        nombre = "Sin Nombre" if doc_tipo == 5 else self.razon_social
+        return {"documentoTipo": doc_tipo, "documentoNumero": doc_numero, "nombre": nombre, "cargo": "Cliente"}
 
 
 class CuotaRequest(BaseModel):

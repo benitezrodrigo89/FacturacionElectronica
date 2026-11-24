@@ -25,7 +25,7 @@
     <table class="table table-hover table-sm mb-0">
       <thead class="table-light">
         <tr>
-          <th>RUC</th>
+          <th>Identificación</th>
           <th>Razón Social</th>
           <th>Dirección</th>
           <th>Teléfono</th>
@@ -37,7 +37,16 @@
       <tbody>
         {% for c in clientes %}
         <tr class="{% if not c.activo %}text-muted{% endif %}">
-          <td class="font-monospace">{{ c.ruc }}</td>
+          <td class="font-monospace">
+            {% if c.contribuyente %}
+              {{ c.ruc or '—' }}
+            {% else %}
+              <span class="text-muted small">
+                {% if c.documento_tipo == 1 %}CI{% elif c.documento_tipo == 2 %}Pas.{% elif c.documento_tipo == 3 %}Céd.Ext{% elif c.documento_tipo == 5 %}Innominado{% else %}Doc.{% endif %}
+                {% if c.documento_numero and c.documento_numero != '0' %} {{ c.documento_numero }}{% endif %}
+              </span>
+            {% endif %}
+          </td>
           <td>{{ c.razon_social }}</td>
           <td class="text-truncate" style="max-width:180px">{{ c.direccion or '—' }}</td>
           <td>{{ c.telefono or '—' }}</td>

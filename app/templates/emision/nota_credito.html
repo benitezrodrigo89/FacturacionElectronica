@@ -8,44 +8,7 @@
 </div>
 
 <!-- Receptor -->
-<div class="card mb-3">
-  <div class="card-header fw-semibold py-2 bg-primary text-white">
-    <i class="bi bi-person me-1"></i>Datos del Receptor
-  </div>
-  <div class="card-body">
-    <div class="mb-3 position-relative">
-      <label class="form-label text-muted small">Buscar cliente guardado</label>
-      <input type="text" id="buscar-cliente" class="form-control form-control-sm"
-             placeholder="Escribí razón social o RUC…"
-             hx-get="/clientes/buscar" hx-trigger="keyup changed delay:300ms"
-             hx-target="#resultados-cliente" name="q" autocomplete="off">
-      <div id="resultados-cliente" class="list-group shadow-sm position-absolute w-100"
-           style="z-index:1000; top:100%"></div>
-    </div>
-    <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label">RUC <span class="text-danger">*</span></label>
-        <input type="text" id="ruc" class="form-control" placeholder="1234567-8" required>
-      </div>
-      <div class="col-md-8">
-        <label class="form-label">Razón Social <span class="text-danger">*</span></label>
-        <input type="text" id="razon_social" class="form-control" required>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Dirección</label>
-        <input type="text" id="direccion" class="form-control">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Teléfono</label>
-        <input type="text" id="telefono" class="form-control">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Email</label>
-        <input type="email" id="email" class="form-control">
-      </div>
-    </div>
-  </div>
-</div>
+{% include 'emision/_receptor.html' %}
 
 <!-- Datos NCE -->
 <div class="card mb-3">
@@ -212,10 +175,9 @@
   <a href="/" class="btn btn-outline-secondary">Cancelar</a>
 </div>
 
-<script src="/static/emision.js?v=4"></script>
+<script src="/static/emision.js?v=5"></script>
 <script>
   addItem(true);
-  iniciarValidacionRuc();
 
   // Buscar facturas aprobadas cuando cambia el RUC
   function buscarFacturasPorRuc(ruc) {
@@ -231,25 +193,13 @@
   }
 
   document.getElementById('ruc').addEventListener('change', function() {
-    buscarFacturasPorRuc(this.value.trim());
+    if (document.getElementById('es-contribuyente')?.checked) buscarFacturasPorRuc(this.value.trim());
   });
 
-  // Autocomplete de clientes — al seleccionar también busca facturas
-  document.addEventListener('click', function(e) {
-    const item = e.target.closest('.cliente-resultado');
-    if (item) {
-      document.getElementById('ruc').value          = item.dataset.ruc;
-      document.getElementById('razon_social').value = item.dataset.razon;
-      document.getElementById('direccion').value    = item.dataset.direccion;
-      document.getElementById('telefono').value     = item.dataset.telefono;
-      document.getElementById('email').value        = item.dataset.email;
-      document.getElementById('buscar-cliente').value = '';
-      document.getElementById('resultados-cliente').innerHTML = '';
-      buscarFacturasPorRuc(item.dataset.ruc);
-      return;
-    }
+  initReceptor();
 
-    // Selección de factura referenciada
+  // Selección de factura referenciada
+  document.addEventListener('click', function(e) {
     const factura = e.target.closest('.factura-ref-item');
     if (factura) {
       document.getElementById('cdc-ref').value = factura.dataset.cdc;
@@ -372,8 +322,7 @@
   function submitNCE() {
     const items = getItems(true);
     if (!items.length) { alert('Agregá al menos un ítem.'); return; }
-    if (!document.getElementById('ruc').value.trim()) { alert('El RUC del receptor es obligatorio.'); return; }
-    if (!document.getElementById('razon_social').value.trim()) { alert('La razón social es obligatoria.'); return; }
+    if (!validarReceptor()) return;
 
     const cdcRef = document.getElementById('cdc-ref').value.trim();
     if (cdcRef.length !== 44) {
@@ -394,13 +343,7 @@
     if (credito) condicion_pago.credito = credito;
 
     const payload = {
-      receptor: {
-        ruc:          document.getElementById('ruc').value.trim(),
-        razon_social: document.getElementById('razon_social').value.trim(),
-        direccion:    document.getElementById('direccion').value.trim() || null,
-        telefono:     document.getElementById('telefono').value.trim() || null,
-        email:        document.getElementById('email').value.trim() || null,
-      },
+      receptor: getReceptorPayload(),
       items,
       motivo: parseInt(document.getElementById('motivo').value),
       condicion_pago,

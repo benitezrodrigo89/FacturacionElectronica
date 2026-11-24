@@ -71,8 +71,6 @@ def _build_condicion(condicion_pago, monto_pago: int) -> dict:
 def _build_data(req: FacturaRequest, numero_doc: int, cfg: dict) -> dict:
     total = sum(int(i.cantidad * i.precio_unitario) for i in req.items)
     monto_pago = req.condicion_pago.monto or total
-    ruc = req.receptor.ruc.strip()
-    doc_numero = ruc.split('-')[0] if '-' in ruc else ruc
     es_prueba = cfg.get('ambiente') == 'test'
     codigo_seg = str(random.randint(100_000_000, 999_999_999))
 
@@ -89,33 +87,8 @@ def _build_data(req: FacturaRequest, numero_doc: int, cfg: dict) -> dict:
         "tipoImpuesto": 1,
         "moneda": "PYG",
         "timbrado": cfg['timbrado_numero'],
-        "cliente": {
-            "contribuyente": True,
-            "ruc": ruc,
-            "razonSocial": req.receptor.razon_social,
-            "tipoOperacion": 1,
-            "direccion": req.receptor.direccion or "Sin especificar",
-            "numeroCasa": "0",
-            "departamento": 1,
-            "departamentoDescripcion": "ASUNCION",
-            "distrito": 1,
-            "distritoDescripcion": "ASUNCION (DISTRITO)",
-            "ciudad": 1,
-            "ciudadDescripcion": "ASUNCION (DISTRITO)",
-            "pais": "PRY",
-            "paisDescripcion": "Paraguay",
-            "tipoContribuyente": 2,
-            "documentoTipo": 1,
-            "documentoNumero": doc_numero,
-            "telefono": req.receptor.telefono or "",
-            "email": req.receptor.email or "",
-        },
-        "usuario": {
-            "documentoTipo": 1,
-            "documentoNumero": doc_numero,
-            "nombre": req.receptor.razon_social,
-            "cargo": "Cliente",
-        },
+        "cliente": req.receptor.build_cliente_block(),
+        "usuario": req.receptor.build_usuario_block(),
         "factura": {"presencia": 1},
         "condicion": _build_condicion(req.condicion_pago, monto_pago),
         "items": [
@@ -206,7 +179,7 @@ async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_ke
             cdc=cdc,
             numero_doc=numero_doc,
             xml_firmado=xml_firmado,
-            ruc_receptor=req.receptor.ruc,
+            ruc_receptor=req.receptor.id_para_bd(),
             razon_social_receptor=req.receptor.razon_social,
             monto_total=total,
             data_documento={**data, 'timbrado': cfg['timbrado_numero']},
