@@ -10,22 +10,7 @@
   </a>
 </div>
 
-<!-- Buscador por RUC / Razón Social -->
-<div class="mb-3">
-  <div class="input-group input-group-sm" style="max-width:400px">
-    <span class="input-group-text"><i class="bi bi-search"></i></span>
-    <input type="search" id="buscador" class="form-control"
-           placeholder="Buscar por RUC o razón social…"
-           autocomplete="off"
-           oninput="debounceBuscar(this.value)">
-    <button class="btn btn-outline-secondary" type="button"
-            onclick="limpiarBusqueda()" title="Limpiar búsqueda">
-      <i class="bi bi-x-lg"></i>
-    </button>
-  </div>
-</div>
-
-<!-- Filtros: período + estado -->
+<!-- Filtros: período + estado + buscador -->
 <div class="d-flex flex-wrap gap-2 mb-3 align-items-center" id="filtros-wrap">
 
   <!-- Período -->
@@ -66,6 +51,21 @@
             onclick="filtrar(this)">
       <i class="bi bi-clock me-1"></i>Pendientes
     </button>
+  </div>
+
+  <!-- Buscador: arriba en mobile, al final en desktop -->
+  <div class="order-first order-md-last" id="buscador-wrap">
+    <div class="input-group input-group-sm">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input type="search" id="buscador" class="form-control"
+             placeholder="RUC o razón social…"
+             autocomplete="off"
+             oninput="debounceBuscar(this.value)">
+      <button class="btn btn-outline-secondary" type="button"
+              onclick="limpiarBusqueda()" title="Limpiar">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
   </div>
 
   <span id="spinner" class="htmx-indicator spinner-border spinner-border-sm text-secondary"></span>
@@ -514,4 +514,8 @@ async function confirmarAnulacion() {
   }
 }
 </script>
+<style>
+  #buscador-wrap { width: 100%; max-width: 340px; min-width: 220px; }
+  @media (min-width: 768px) { #buscador-wrap { width: auto; } }
+</style>
 {% endblock %}
