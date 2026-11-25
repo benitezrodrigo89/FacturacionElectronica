@@ -2,7 +2,7 @@
 {% block content %}
 
 <div class="d-flex align-items-center gap-2 mb-3">
-  <h4 class="mb-0"><i class="bi bi-arrow-repeat me-1 text-warning"></i>Reenvío por Lote</h4>
+  <h4 class="mb-0"><i class="bi bi-send me-1 text-warning"></i>Envío por Lote</h4>
   <span class="text-muted small">Documentos pendientes o con error de comunicación</span>
 </div>
 
@@ -38,7 +38,7 @@
           <td>
             <div id="res-lote-{{ loop.index }}">
               <button class="btn btn-sm btn-outline-primary"
-                      hx-post="/reenvio/consultar-lote/{{ lote.protocolo_lote }}"
+                      hx-post="/envio/consultar-lote/{{ lote.protocolo_lote }}"
                       hx-target="#res-lote-{{ loop.index }}"
                       hx-swap="outerHTML"
                       hx-indicator="#spin-lote-{{ loop.index }}">
@@ -74,27 +74,27 @@
       </div>
       <div class="card-body">
         <p class="text-muted small mb-3">
-          Se consultará cada documento en SIFEN. Los que no existan serán enviados en lote asíncrono.
-          Los que ya estén aprobados se actualizarán automáticamente.
+          Se consultará cada documento en SIFEN. Los aprobados se actualizarán automáticamente;
+          los que no existan serán enviados en lote asíncrono.
         </p>
 
         {# Botón para ver detalle (carga la tabla vía HTMX) #}
         <div class="d-flex gap-2 flex-wrap">
           <button class="btn btn-sm btn-outline-secondary"
-                  hx-get="/reenvio/docs/{{ tipo }}"
+                  hx-get="/envio/docs/{{ tipo }}"
                   hx-target="#tabla-{{ tipo }}"
                   hx-swap="innerHTML">
             <i class="bi bi-list-ul me-1"></i>Ver documentos
           </button>
 
           <button class="btn btn-sm btn-warning"
-                  hx-post="/reenvio/procesar/{{ tipo }}"
+                  hx-post="/envio/procesar/{{ tipo }}"
                   hx-target="#resultado-{{ tipo }}"
                   hx-swap="innerHTML"
                   hx-indicator="#spin-{{ tipo }}"
-                  hx-confirm="¿Procesar {{ (datos.pendiente or 0) + (datos.error or 0) }} documento(s) de tipo {{ datos.nombre }}?">
+                  hx-confirm="¿Enviar {{ (datos.pendiente or 0) + (datos.error or 0) }} documento(s) de tipo {{ datos.nombre }}?">
             <span id="spin-{{ tipo }}" class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
-            <i class="bi bi-arrow-repeat me-1"></i>Consultar y reenviar
+            <i class="bi bi-send me-1"></i>Consultar y enviar
           </button>
         </div>
 

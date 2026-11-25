@@ -5,7 +5,7 @@
   <span class="badge bg-warning text-dark">En procesamiento</span>
   <span class="text-muted small">Lote {{ protocolo_lote }} aún no terminó (código 0361). Esperá unos minutos.</span>
   <button class="btn btn-sm btn-outline-primary"
-          hx-post="/reenvio/consultar-lote/{{ protocolo_lote }}"
+          hx-post="/envio/consultar-lote/{{ protocolo_lote }}"
           hx-target="closest div"
           hx-swap="outerHTML">
     <i class="bi bi-arrow-clockwise me-1"></i>Reintentar
@@ -38,7 +38,7 @@
   {% endif %}
   <div class="mt-2 small text-muted">
     Actualizando página en <span id="cd-lote">4</span>s…
-    <a href="/reenvio" class="fw-semibold">ir ahora</a>
+    <a href="/envio" class="fw-semibold">ir ahora</a>
   </div>
   <script>
     (function() {
@@ -46,7 +46,7 @@
       var t = setInterval(function() {
         s--; var el = document.getElementById('cd-lote');
         if (el) el.textContent = s;
-        if (s <= 0) { clearInterval(t); window.location.href = '/reenvio'; }
+        if (s <= 0) { clearInterval(t); window.location.href = '/envio'; }
       }, 1000);
     })();
   </script>
@@ -57,7 +57,7 @@
   <span class="text-muted small">{{ resultado.msg }}</span>
   {% if resultado.codigo not in ('0364',) %}
   <button class="btn btn-sm btn-outline-secondary"
-          hx-post="/reenvio/consultar-lote/{{ protocolo_lote }}"
+          hx-post="/envio/consultar-lote/{{ protocolo_lote }}"
           hx-target="closest div"
           hx-swap="outerHTML">
     <i class="bi bi-search me-1"></i>Consultar de nuevo

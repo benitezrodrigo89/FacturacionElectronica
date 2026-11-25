@@ -20,7 +20,7 @@
     <small class="text-muted">Consultá el resultado en ≥10 minutos.</small>
     <div class="mt-2" id="res-nuevo-lote">
       <button class="btn btn-sm btn-outline-primary"
-              hx-post="/reenvio/consultar-lote/{{ resultado.protocolo_lote }}"
+              hx-post="/envio/consultar-lote/{{ resultado.protocolo_lote }}"
               hx-target="#res-nuevo-lote"
               hx-swap="outerHTML"
               hx-indicator="#spin-nuevo-lote">
@@ -43,16 +43,16 @@
   {# Auto-refresh cuando todo fue resuelto sin enviar lote (aprobados por consulta directa) #}
   {% if resultado.aprobados and not resultado.protocolo_lote %}
   <div class="mt-2 small text-muted">
-    Actualizando página en <span id="cd-reenvio">4</span>s…
-    <a href="/reenvio" class="fw-semibold">ir ahora</a>
+    Actualizando página en <span id="cd-envio">4</span>s…
+    <a href="/envio" class="fw-semibold">ir ahora</a>
   </div>
   <script>
     (function() {
       var s = 4;
       var t = setInterval(function() {
-        s--; var el = document.getElementById('cd-reenvio');
+        s--; var el = document.getElementById('cd-envio');
         if (el) el.textContent = s;
-        if (s <= 0) { clearInterval(t); window.location.href = '/reenvio'; }
+        if (s <= 0) { clearInterval(t); window.location.href = '/envio'; }
       }, 1000);
     })();
   </script>

@@ -1,13 +1,13 @@
 """
-Sección de reenvío por lote — documentos en estado pendiente/error.
+Sección de envío por lote — documentos en estado pendiente/error.
 
 Flujo:
-  1. GET /reenvio          → muestra docs pendiente/error por tipo
-  2. POST /reenvio/procesar → consulta cada CDC en SIFEN;
-                              los que no existen los envía en lote async.
-                              Guarda dProtConsLote en BD.
-  3. POST /reenvio/consultar-lote → consulta el resultado del lote
-                                    y actualiza estados en BD.
+  1. GET /envio          → muestra docs pendiente/error por tipo
+  2. POST /envio/procesar → consulta cada CDC en SIFEN;
+                            los que no existen los envía en lote async.
+                            Guarda dProtConsLote en BD.
+  3. POST /envio/consultar-lote → consulta el resultado del lote
+                                  y actualiza estados en BD.
 """
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -57,7 +57,7 @@ def _resumen_reenvio(repo: RepositorioDE) -> dict:
 # PÁGINA PRINCIPAL
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.get('/reenvio', response_class=HTMLResponse)
+@router.get('/envio', response_class=HTMLResponse)
 async def pagina_reenvio(request: Request):
     resumen = {}
     lotes_pendientes = []
@@ -102,7 +102,7 @@ async def pagina_reenvio(request: Request):
 # FRAGMENTO HTMX: tabla de docs pendiente/error de un tipo
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.get('/reenvio/docs/{tipo_documento}', response_class=HTMLResponse)
+@router.get('/envio/docs/{tipo_documento}', response_class=HTMLResponse)
 async def tabla_docs_reenvio(request: Request, tipo_documento: int):
     docs  = []
     error = None
@@ -126,7 +126,7 @@ async def tabla_docs_reenvio(request: Request, tipo_documento: int):
 # ACCIÓN: procesar reenvío por lote (fragmento HTMX)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post('/reenvio/procesar/{tipo_documento}', response_class=HTMLResponse)
+@router.post('/envio/procesar/{tipo_documento}', response_class=HTMLResponse)
 async def procesar_reenvio(request: Request, tipo_documento: int):
     """
     Para cada doc pendiente/error del tipo indicado:
@@ -209,7 +209,7 @@ async def procesar_reenvio(request: Request, tipo_documento: int):
 # ACCIÓN: consultar resultado de un lote (fragmento HTMX)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post('/reenvio/consultar-lote/{protocolo_lote:path}', response_class=HTMLResponse)
+@router.post('/envio/consultar-lote/{protocolo_lote:path}', response_class=HTMLResponse)
 async def consultar_resultado_lote(request: Request, protocolo_lote: str):
     """
     Consulta el estado del lote en SIFEN y actualiza la BD con los resultados.

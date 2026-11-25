@@ -104,7 +104,7 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
     Genera y firma una Nota de Crédito Electrónica (tipo 5), la guarda en BD como `pendiente` y retorna el CDC.
 
     **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
-    El envío a SIFEN se realiza desde la página /reenvio o via el daemon_enviador (cron cada 15 min).
+    El envío a SIFEN se realiza desde la página /envio o via el daemon_enviador (cron cada 15 min).
 
     Indicar `documento_referencia` con el CDC de la factura original que se acredita.
     """
@@ -437,7 +437,7 @@ async def emitir_nota_debito(req: NotaDebitoRequest, _key: str = Depends(require
     Genera y firma una Nota de Débito Electrónica (tipo 6), la guarda en BD como `pendiente` y retorna el CDC.
 
     **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
-    El envío a SIFEN se realiza desde la página /reenvio o via el daemon_enviador (cron cada 15 min).
+    El envío a SIFEN se realiza desde la página /envio o via el daemon_enviador (cron cada 15 min).
 
     Usada para incrementar el valor de una factura ya emitida (intereses, comisiones, ajustes).
     Indicar `documento_referencia` con el CDC de la factura original.
@@ -568,7 +568,7 @@ async def emitir_autofactura(req: AutofacturaRequest, _key: str = Depends(requir
     Genera y firma una Autofactura Electrónica (tipo 4), la guarda en BD como `pendiente` y retorna el CDC.
 
     **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
-    El envío a SIFEN se realiza desde la página /reenvio o via el daemon_enviador (cron cada 15 min).
+    El envío a SIFEN se realiza desde la página /envio o via el daemon_enviador (cron cada 15 min).
 
     Usada cuando la empresa compra a una persona física no contribuyente.
     El `vendedor` es la persona física que vendió, y la `constancia` es la
@@ -606,7 +606,7 @@ async def emitir_nota_remision(req: NotaRemisionRequest, _key: str = Depends(req
     Genera y firma una Nota de Remisión Electrónica (tipo 7), la guarda en BD como `pendiente` y retorna el CDC.
 
     **Flujo:** genera XML → firma XMLDSig → guarda en BD → retorna `pendiente`.
-    El envío a SIFEN se realiza desde la página /reenvio o via el daemon_enviador (cron cada 15 min).
+    El envío a SIFEN se realiza desde la página /envio o via el daemon_enviador (cron cada 15 min).
 
     Usada para traslado de mercaderías. Los ítems no requieren precio.
     Incluir `transportista` con matrícula del vehículo cuando corresponda.
