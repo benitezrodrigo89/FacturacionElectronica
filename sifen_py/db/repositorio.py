@@ -382,6 +382,24 @@ class RepositorioDE:
             """, (limite,))
             return cur.fetchall()
 
+    def buscar_por_receptor(self, termino: str, limite: int = 100) -> list:
+        """Busca DEs por RUC o razón social del receptor (búsqueda parcial, sin filtro de período)."""
+        patron = f'%{termino.strip()}%'
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, cdc, numero_doc, tipo_documento, estado, codigo_sifen,
+                       descripcion_sifen, protocolo_autorizacion,
+                       ruc_receptor, razon_social_receptor, monto_total,
+                       fecha_emision, fecha_envio, intentos,
+                       data_json IS NOT NULL AS data_json
+                FROM documentos_electronicos
+                WHERE ruc_receptor ILIKE %s OR razon_social_receptor ILIKE %s
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (patron, patron, limite))
+            return cur.fetchall()
+
     def proximo_numero_doc(
         self,
         establecimiento:  str = '001',

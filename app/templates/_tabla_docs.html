@@ -2,6 +2,14 @@
 <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>
 {% else %}
 
+{% if busqueda %}
+<div class="alert alert-info py-2 small mb-3">
+  <i class="bi bi-search me-1"></i>
+  Resultados para <strong>{{ busqueda }}</strong> —
+  {{ docs | length }} documento{{ 's' if docs | length != 1 else '' }} encontrado{{ 's' if docs | length != 1 else '' }}.
+</div>
+{% else %}
+
 <!-- Tarjetas de resumen -->
 {% set rt = resumen_tipo if resumen_tipo is defined else {} %}
 {% set rm = resumen_montos if resumen_montos is defined else {} %}
@@ -70,6 +78,8 @@
     </div>
   </div>
 </div>
+
+{% endif %}{# fin bloque sin búsqueda #}
 
 <!-- Tabla -->
 <div class="card">

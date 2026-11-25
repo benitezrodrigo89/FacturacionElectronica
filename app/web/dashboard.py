@@ -59,6 +59,7 @@ async def tabla_documentos(
     estado: Optional[str] = Query(None),
     periodo: str = Query('hoy'),
     limit: int = Query(100),
+    q: Optional[str] = Query(None),
 ):
     """Fragmento HTMX: resumen + tabla de documentos."""
     docs = []
@@ -71,14 +72,18 @@ async def tabla_documentos(
         db = Conexion()
         db.conectar()
         repo = RepositorioDE(db)
-        docs = _rows(
-            repo.listar_por_estado(estado, limite=limit, periodo=periodo)
-            if estado else
-            repo.listar_recientes(limite=limit, periodo=periodo)
-        )
-        resumen = repo.resumen_estados(periodo=periodo)
-        resumen_tipo = repo.resumen_por_tipo(periodo=periodo)
-        resumen_montos = repo.resumen_montos(periodo=periodo)
+
+        if q and q.strip():
+            docs = _rows(repo.buscar_por_receptor(q.strip(), limite=limit))
+        else:
+            docs = _rows(
+                repo.listar_por_estado(estado, limite=limit, periodo=periodo)
+                if estado else
+                repo.listar_recientes(limite=limit, periodo=periodo)
+            )
+            resumen = repo.resumen_estados(periodo=periodo)
+            resumen_tipo = repo.resumen_por_tipo(periodo=periodo)
+            resumen_montos = repo.resumen_montos(periodo=periodo)
 
         # Para cada FE/NDE/etc., buscar si tiene NCE/NDE asociada
         for doc in docs:
@@ -100,5 +105,6 @@ async def tabla_documentos(
         "resumen_montos": resumen_montos,
         "estado_filtro": estado,
         "periodo": periodo,
+        "busqueda": q or '',
         "error": error,
     })

@@ -10,8 +10,23 @@
   </a>
 </div>
 
+<!-- Buscador por RUC / Razón Social -->
+<div class="mb-3">
+  <div class="input-group input-group-sm" style="max-width:400px">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="search" id="buscador" class="form-control"
+           placeholder="Buscar por RUC o razón social…"
+           autocomplete="off"
+           oninput="debounceBuscar(this.value)">
+    <button class="btn btn-outline-secondary" type="button"
+            onclick="limpiarBusqueda()" title="Limpiar búsqueda">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+</div>
+
 <!-- Filtros: período + estado -->
-<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center" id="filtros-wrap">
 
   <!-- Período -->
   <div class="btn-group" role="group" id="filtros-periodo">
@@ -55,6 +70,7 @@
 
   <span id="spinner" class="htmx-indicator spinner-border spinner-border-sm text-secondary"></span>
 </div>
+
 
 <!-- Contenido cargado por HTMX -->
 <div id="content"
@@ -243,11 +259,42 @@ function getEstado() {
   return btn ? btn.dataset.estado : '';
 }
 
+function getBusqueda() {
+  return (document.getElementById('buscador').value || '').trim();
+}
+
 function recargarTabla() {
+  const q = getBusqueda();
+  if (q) {
+    htmx.ajax('GET', `/documentos-tabla?q=${encodeURIComponent(q)}`, {target: '#content', swap: 'innerHTML'});
+    return;
+  }
   const p = getPeriodo();
   const e = getEstado();
   const qs = `periodo=${p}${e ? '&estado=' + e : ''}`;
   htmx.ajax('GET', `/documentos-tabla?${qs}`, {target: '#content', swap: 'innerHTML'});
+}
+
+let _buscarTimer = null;
+function debounceBuscar(val) {
+  clearTimeout(_buscarTimer);
+  const filtrosWrap = document.getElementById('filtros-wrap');
+  if (val.trim()) {
+    filtrosWrap.style.opacity = '0.4';
+    filtrosWrap.style.pointerEvents = 'none';
+  } else {
+    filtrosWrap.style.opacity = '';
+    filtrosWrap.style.pointerEvents = '';
+  }
+  _buscarTimer = setTimeout(recargarTabla, 350);
+}
+
+function limpiarBusqueda() {
+  document.getElementById('buscador').value = '';
+  const filtrosWrap = document.getElementById('filtros-wrap');
+  filtrosWrap.style.opacity = '';
+  filtrosWrap.style.pointerEvents = '';
+  recargarTabla();
 }
 
 function filtrar(btn) {
