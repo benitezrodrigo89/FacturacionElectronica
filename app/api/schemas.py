@@ -302,6 +302,11 @@ class FacturaRequest(BaseModel):
         ge=1,
         description="Número de factura asignado por el sistema externo. Si se omite, se usa el próximo número disponible en la BD.",
     )
+    origen: Optional[str] = Field(
+        default=None,
+        max_length=50,
+        description="Identificador del sistema que emite el documento, ej: 'genexus', 'erp', 'pos'. Si se omite se registra como 'api'.",
+    )
 
 
 class CancelacionRequest(BaseModel):

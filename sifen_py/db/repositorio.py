@@ -48,6 +48,7 @@ class RepositorioDE:
         monto_total:           int           = None,
         data_documento:        dict          = None,
         cdc_doc_referenciado:  str           = None,
+        origen:                str           = 'api',
     ) -> int:
         """
         Inserta un DE en estado 'pendiente' antes de enviarlo a SIFEN.
@@ -63,13 +64,13 @@ class RepositorioDE:
                     tipo_documento, fecha_emision, ruc_receptor,
                     razon_social_receptor, monto_total,
                     xml_firmado, soap_envelope, data_json, estado, fecha_envio,
-                    cdc_doc_referenciado
+                    cdc_doc_referenciado, origen
                 ) VALUES (
                     %(cdc)s, %(numero_doc)s, %(establecimiento)s, %(punto_expedicion)s,
                     %(tipo_documento)s, %(fecha_emision)s, %(ruc_receptor)s,
                     %(razon_social_receptor)s, %(monto_total)s,
                     %(xml_firmado)s, %(soap_envelope)s, %(data_json)s, 'pendiente', NOW(),
-                    %(cdc_doc_referenciado)s
+                    %(cdc_doc_referenciado)s, %(origen)s
                 )
                 ON CONFLICT (cdc) DO UPDATE SET
                     intentos      = documentos_electronicos.intentos + 1,
@@ -91,6 +92,7 @@ class RepositorioDE:
                 'soap_envelope':         soap_envelope,
                 'data_json':             data_json_str,
                 'cdc_doc_referenciado':  cdc_doc_referenciado,
+                'origen':                origen or 'api',
             })
             row = cur.fetchone()
             id_ = row[0] if isinstance(row, tuple) else row['id']
@@ -392,7 +394,7 @@ class RepositorioDE:
                        descripcion_sifen, protocolo_autorizacion,
                        ruc_receptor, razon_social_receptor, monto_total,
                        fecha_emision, fecha_envio, intentos,
-                       data_json IS NOT NULL AS data_json
+                       data_json IS NOT NULL AS data_json, origen
                 FROM documentos_electronicos
                 WHERE {filtro_fecha}
                 ORDER BY created_at DESC
@@ -410,7 +412,7 @@ class RepositorioDE:
                        descripcion_sifen, protocolo_autorizacion,
                        ruc_receptor, razon_social_receptor, monto_total,
                        fecha_emision, fecha_envio, intentos,
-                       data_json IS NOT NULL AS data_json
+                       data_json IS NOT NULL AS data_json, origen
                 FROM documentos_electronicos
                 WHERE ruc_receptor ILIKE %s OR razon_social_receptor ILIKE %s
                 ORDER BY created_at DESC

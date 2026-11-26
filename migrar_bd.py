@@ -47,6 +47,16 @@ MIGRACIONES = [
       ON clientes_sifen (ruc)
       WHERE activo = TRUE AND ruc IS NOT NULL;
     """,
+    # v5: columna origen para identificar desde dónde se emitió el DE
+    # Valores: 'api' (integración externa), 'webapp' (emisión manual), o texto libre (ej: 'genexus', 'erp')
+    """
+    ALTER TABLE documentos_electronicos
+    ADD COLUMN IF NOT EXISTS origen VARCHAR(50) NOT NULL DEFAULT 'api';
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_de_origen
+    ON documentos_electronicos (origen);
+    """,
 ]
 
 def main():

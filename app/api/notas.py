@@ -209,6 +209,7 @@ async def emitir_nota_credito(req: NotaCreditoRequest, _key: str = Depends(requi
             monto_total=total,
             data_documento={**data, 'timbrado': cfg['timbrado_numero']},
             cdc_doc_referenciado=cdc_ref,
+            origen=getattr(req, 'origen', None) or 'api',
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error guardando en BD: {e}")
@@ -310,7 +311,8 @@ def _build_data_nre(req: NotaRemisionRequest, numero_doc: int, cfg: dict) -> dic
 
 
 def _emit_documento(data: dict, tipo_doc: int, cfg: dict, sifen_config,
-                    ruc_receptor: str, razon_social_receptor: str) -> FacturaResponse:
+                    ruc_receptor: str, razon_social_receptor: str,
+                    origen: str = 'api') -> FacturaResponse:
     """Flujo común: XML → firma → BD → retorna pendiente.
     El envío a SIFEN lo realiza el daemon_enviador por lote asíncrono."""
     db   = Conexion()
@@ -350,6 +352,7 @@ def _emit_documento(data: dict, tipo_doc: int, cfg: dict, sifen_config,
             razon_social_receptor=razon_social_receptor,
             monto_total=None,
             data_documento={**data, 'timbrado': cfg['timbrado_numero']},
+            origen=origen,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error guardando en BD: {e}")
@@ -464,6 +467,7 @@ async def emitir_nota_debito(req: NotaDebitoRequest, _key: str = Depends(require
         sifen_config=sifen_config,
         ruc_receptor=req.receptor.id_para_bd(),
         razon_social_receptor=req.receptor.razon_social,
+        origen=getattr(req, 'origen', None) or 'api',
     )
 
 
@@ -633,4 +637,5 @@ async def emitir_nota_remision(req: NotaRemisionRequest, _key: str = Depends(req
         sifen_config=sifen_config,
         ruc_receptor=req.receptor.id_para_bd(),
         razon_social_receptor=req.receptor.razon_social,
+        origen=getattr(req, 'origen', None) or 'api',
     )

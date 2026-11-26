@@ -102,6 +102,7 @@
             <th class="text-end d-none d-sm-table-cell">Monto</th>
             <th>Estado</th>
             <th class="d-none d-lg-table-cell">CDC</th>
+            <th class="d-none d-lg-table-cell">Origen</th>
             <th class="text-center">Acciones</th>
           </tr>
         </thead>
@@ -165,6 +166,14 @@
               {% endif %}
             </td>
             <td class="d-none d-lg-table-cell"><code class="cdc">{{ doc.cdc[:16] }}…</code></td>
+            <td class="d-none d-lg-table-cell">
+              {% set org = doc.get('origen', 'api') if doc.get is defined else (doc.origen if doc.origen is defined else 'api') %}
+              {% if org == 'webapp' %}
+                <span class="badge bg-info text-dark" title="Emitido desde la webapp">WEB</span>
+              {% else %}
+                <span class="badge bg-secondary" title="Emitido vía API — {{ org }}">{{ org | upper }}</span>
+              {% endif %}
+            </td>
             <td class="text-center text-nowrap">
               {% if doc.data_json %}
               <a href="/api/v1/facturas/{{ doc.cdc }}/kude"

@@ -183,6 +183,7 @@ async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_ke
             razon_social_receptor=req.receptor.razon_social,
             monto_total=total,
             data_documento={**data, 'timbrado': cfg['timbrado_numero']},
+            origen=req.origen or 'api',
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error guardando en BD: {e}")
