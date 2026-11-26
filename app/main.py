@@ -27,9 +27,12 @@ logger.add(
     format='{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}',
 )
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import Headers
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api.facturas import router as facturas_router
 from app.api.consultas import router as consultas_router
@@ -41,6 +44,30 @@ from app.web.emision import router as emision_router
 from app.web.clientes import router as clientes_router
 from app.web.productos import router as productos_router
 from app.web.reenvio import router as reenvio_router
+
+class EncodingFixMiddleware(BaseHTTPMiddleware):
+    """
+    Si el body llega en Latin-1/ANSI (común en Genexus sin charset explícito),
+    lo re-codifica a UTF-8 antes de que FastAPI intente parsearlo como JSON.
+    """
+    async def dispatch(self, request: Request, call_next):
+        content_type = request.headers.get('content-type', '')
+        if 'application/json' in content_type and 'utf-8' not in content_type.lower():
+            body = await request.body()
+            if body:
+                try:
+                    body.decode('utf-8')
+                except UnicodeDecodeError:
+                    try:
+                        body = body.decode('latin-1').encode('utf-8')
+                        # Reconstruir el request con el body corregido
+                        async def new_receive():
+                            return {'type': 'http.request', 'body': body, 'more_body': False}
+                        request = Request(request.scope, new_receive)
+                    except Exception:
+                        pass
+        return await call_next(request)
+
 
 app = FastAPI(
     title="SIFEN Paraguay — Facturación Electrónica",
@@ -54,6 +81,7 @@ app = FastAPI(
     redoc_url="/api/redoc",
 )
 
+app.add_middleware(EncodingFixMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
