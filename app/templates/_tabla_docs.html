@@ -32,9 +32,15 @@
   </div>
   <div class="col-6 col-md-3">
     <div class="card text-center p-3">
-      <div class="stat-number text-warning">{{ resumen.get('pendiente', 0) }}</div>
-      <div class="small text-muted mt-1">Pendientes</div>
-      {% if rm.get('pendiente') %}<div class="small text-warning fw-semibold mt-1">{{ fmt_gs(rm.get('pendiente')) }}</div>{% endif %}
+      {% set total_pendiente = resumen.get('pendiente', 0) + resumen.get('en_lote', 0) %}
+      <div class="stat-number text-warning">{{ total_pendiente }}</div>
+      <div class="small text-muted mt-1">Pendientes
+        {% if resumen.get('en_lote', 0) %}
+        <span class="badge bg-warning text-dark ms-1" title="{{ resumen.get('en_lote') }} en lote enviado">{{ resumen.get('en_lote') }} en lote</span>
+        {% endif %}
+      </div>
+      {% set monto_pend = (rm.get('pendiente') or 0) + (rm.get('en_lote') or 0) %}
+      {% if monto_pend %}<div class="small text-warning fw-semibold mt-1">{{ fmt_gs(monto_pend) }}</div>{% endif %}
     </div>
   </div>
   <div class="col-6 col-md-3">
@@ -138,6 +144,9 @@
                 {% endif %}
               {% elif doc.estado == 'cancelado' %}
                 <span class="badge bg-secondary rounded-pill">Cancelado</span>
+              {% elif doc.estado == 'en_lote' %}
+                <span class="badge badge-pendiente rounded-pill">En lote</span>
+                <div class="small text-muted mt-1" style="font-size:.7rem">Esperando resultado SIFEN</div>
               {% else %}
                 <span class="badge badge-pendiente rounded-pill">Pendiente</span>
               {% endif %}

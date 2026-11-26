@@ -364,6 +364,24 @@ class RepositorioDE:
             """, (estado, limite))
             return cur.fetchall()
 
+    def listar_por_estados(self, estados: list, limite: int = 100, periodo: str = 'todo') -> list:
+        """Como listar_por_estado pero acepta múltiples estados."""
+        filtro_fecha = self._FILTROS_PERIODO.get(periodo, '1=1')
+        conn = self.db.conectar()
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT id, cdc, numero_doc, tipo_documento, estado, codigo_sifen,
+                       descripcion_sifen, protocolo_autorizacion,
+                       ruc_receptor, razon_social_receptor,
+                       monto_total, fecha_emision, fecha_envio, intentos,
+                       data_json IS NOT NULL AS data_json
+                FROM documentos_electronicos
+                WHERE estado = ANY(%s) AND {filtro_fecha}
+                ORDER BY fecha_envio DESC
+                LIMIT %s
+            """, (list(estados), limite))
+            return cur.fetchall()
+
     def listar_recientes(self, limite: int = 100, periodo: str = 'hoy') -> list:
         """Devuelve los documentos según el período indicado (por defecto: hoy)."""
         filtro_fecha = self._FILTROS_PERIODO.get(periodo, '1=1')

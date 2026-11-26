@@ -68,7 +68,7 @@ async def pagina_reenvio(request: Request):
         repo = RepositorioDE(db)
         resumen = _resumen_reenvio(repo)
 
-        # Lotes enviados que aún no tienen resultado (0300 = recibido, no procesado)
+        # Lotes enviados que aún no tienen resultado final (estado en_lote)
         conn = db.conectar()
         with conn.cursor() as cur:
             cur.execute("""
@@ -77,7 +77,7 @@ async def pagina_reenvio(request: Request):
                 FROM documentos_electronicos
                 WHERE protocolo_lote IS NOT NULL
                   AND protocolo_lote != ''
-                  AND estado = 'pendiente'
+                  AND estado = 'en_lote'
                 GROUP BY protocolo_lote, tipo_documento
                 ORDER BY ultima_fecha DESC
                 LIMIT 20

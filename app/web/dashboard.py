@@ -76,11 +76,12 @@ async def tabla_documentos(
         if q and q.strip():
             docs = _rows(repo.buscar_por_receptor(q.strip(), limite=limit))
         else:
-            docs = _rows(
-                repo.listar_por_estado(estado, limite=limit, periodo=periodo)
-                if estado else
-                repo.listar_recientes(limite=limit, periodo=periodo)
-            )
+            if estado == 'pendiente':
+                docs = _rows(repo.listar_por_estados(['pendiente', 'en_lote'], limite=limit, periodo=periodo))
+            elif estado:
+                docs = _rows(repo.listar_por_estado(estado, limite=limit, periodo=periodo))
+            else:
+                docs = _rows(repo.listar_recientes(limite=limit, periodo=periodo))
             resumen = repo.resumen_estados(periodo=periodo)
             resumen_tipo = repo.resumen_por_tipo(periodo=periodo)
             resumen_montos = repo.resumen_montos(periodo=periodo)
