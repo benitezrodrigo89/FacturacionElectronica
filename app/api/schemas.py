@@ -1,5 +1,5 @@
 """Modelos Pydantic para la API de integración."""
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import List, Optional
 from datetime import datetime
 from enum import IntEnum
@@ -24,6 +24,14 @@ class FormaPago(IntEnum):
 
 
 class ItemRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "descripcion": "Servicio de consultoría",
+        "cantidad": 1,
+        "precio_unitario": 500000,
+        "iva": 10,
+        "codigo": "SRV-001",
+        "unidad_medida": 77,
+    }})
     descripcion: str = Field(min_length=1)
     cantidad: float = Field(gt=0)
     precio_unitario: int = Field(gt=0, description="Precio unitario en guaraníes (PYG)")
@@ -33,6 +41,35 @@ class ItemRequest(BaseModel):
 
 
 class ReceptorRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [
+        {
+            "summary": "Contribuyente con RUC",
+            "value": {
+                "contribuyente": True,
+                "ruc": "80069563-1",
+                "razon_social": "EMPRESA CLIENTE S.A.",
+                "email": "facturacion@cliente.com",
+                "telefono": "0981123456",
+            },
+        },
+        {
+            "summary": "Persona física con cédula",
+            "value": {
+                "contribuyente": False,
+                "documento_tipo": 1,
+                "documento_numero": "1234567",
+                "razon_social": "JUAN PÉREZ",
+            },
+        },
+        {
+            "summary": "Venta innominada (público general)",
+            "value": {
+                "contribuyente": False,
+                "documento_tipo": 5,
+                "razon_social": "Sin Nombre",
+            },
+        },
+    ]})
     contribuyente: bool = Field(
         default=True,
         description="True si el receptor tiene RUC (contribuyente). False si es persona física o innominado.",
@@ -169,6 +206,46 @@ class CondicionPagoRequest(BaseModel):
 
 
 class FacturaRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [
+        {
+            "summary": "Factura contado a contribuyente",
+            "value": {
+                "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A.", "email": "facturacion@cliente.com"},
+                "items": [
+                    {"descripcion": "Servicio de consultoría", "cantidad": 1, "precio_unitario": 500000, "iva": 10},
+                    {"descripcion": "Licencia de software", "cantidad": 2, "precio_unitario": 150000, "iva": 10},
+                ],
+                "condicion_pago": {"tipo": 1, "forma_pago": 1},
+            },
+        },
+        {
+            "summary": "Factura crédito a contribuyente",
+            "value": {
+                "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
+                "items": [{"descripcion": "Producto A", "cantidad": 5, "precio_unitario": 100000, "iva": 10}],
+                "condicion_pago": {
+                    "tipo": 2,
+                    "credito": {"tipo": 1, "plazo": "30 días"},
+                },
+            },
+        },
+        {
+            "summary": "Factura contado a persona física",
+            "value": {
+                "receptor": {"contribuyente": False, "documento_tipo": 1, "documento_numero": "1234567", "razon_social": "JUAN PÉREZ"},
+                "items": [{"descripcion": "Producto B", "cantidad": 1, "precio_unitario": 80000, "iva": 10}],
+                "condicion_pago": {"tipo": 1, "forma_pago": 5},
+            },
+        },
+        {
+            "summary": "Factura innominada (venta al público)",
+            "value": {
+                "receptor": {"contribuyente": False, "documento_tipo": 5, "razon_social": "Sin Nombre"},
+                "items": [{"descripcion": "Producto C", "cantidad": 3, "precio_unitario": 20000, "iva": 10}],
+                "condicion_pago": {"tipo": 1, "forma_pago": 1},
+            },
+        },
+    ]})
     receptor: ReceptorRequest
     items: List[ItemRequest] = Field(min_length=1)
     condicion_pago: CondicionPagoRequest = CondicionPagoRequest()
@@ -181,10 +258,19 @@ class FacturaRequest(BaseModel):
 
 
 class CancelacionRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "motivo": "Error en datos del receptor",
+    }})
     motivo: str = Field(min_length=5, description="Motivo de la cancelación")
 
 
 class InutilizacionRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "tipo_documento": 1,
+        "numero_desde": 5,
+        "numero_hasta": 7,
+        "motivo": "Números generados por error durante pruebas",
+    }})
     tipo_documento: int = Field(default=1, description="1=FE, 5=NCE, 6=NDE, 7=NRE")
     numero_desde:   int = Field(gt=0, description="Primer número a inutilizar")
     numero_hasta:   int = Field(gt=0, description="Último número a inutilizar (puede ser igual a numero_desde)")
@@ -192,6 +278,10 @@ class InutilizacionRequest(BaseModel):
 
 
 class ConformidadRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "tipo_conformidad": 1,
+        "fecha_recepcion": "2026-11-26T10:00:00",
+    }})
     tipo_conformidad: int = Field(
         default=1,
         ge=1, le=2,
@@ -230,6 +320,13 @@ class DocumentoReferencia(BaseModel):
 
 
 class NotaCreditoRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
+        "items": [{"descripcion": "Devolución parcial — Servicio de consultoría", "cantidad": 1, "precio_unitario": 100000, "iva": 10}],
+        "condicion_pago": {"tipo": 1, "forma_pago": 1},
+        "motivo": 2,
+        "documento_referencia": {"cdc": "01800695631001001000000012026112600000000001234561", "formato": 1},
+    }})
     receptor:              ReceptorRequest
     items:                 List[ItemRequest] = Field(min_length=1)
     condicion_pago:        CondicionPagoRequest  = CondicionPagoRequest()
@@ -274,6 +371,18 @@ class TransportistaRequest(BaseModel):
 
 
 class NotaRemisionRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
+        "items": [{"descripcion": "Mercadería A", "cantidad": 10, "unidad_medida": 77}],
+        "motivo": 1,
+        "direccion_origen": "Av. España 123, Asunción",
+        "direccion_destino": "Ruta 2 Km 10, San Lorenzo",
+        "transportista": {
+            "nombre": "CARLOS TRANSPORTES",
+            "documento_numero": "9876543",
+            "vehiculo": {"matricula": "ABC-123", "marca": "Mercedes"},
+        },
+    }})
     receptor:           ReceptorRequest
     items:              List[ItemRemisionRequest] = Field(min_length=1)
     motivo:             MotivoRemision = MotivoRemision.OTROS
@@ -284,6 +393,13 @@ class NotaRemisionRequest(BaseModel):
 
 
 class NotaDebitoRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
+        "items": [{"descripcion": "Ajuste de precio — Servicio adicional", "cantidad": 1, "precio_unitario": 50000, "iva": 10}],
+        "condicion_pago": {"tipo": 1, "forma_pago": 1},
+        "motivo": 8,
+        "documento_referencia": {"cdc": "01800695631001001000000012026112600000000001234561", "formato": 1},
+    }})
     receptor:             ReceptorRequest
     items:                List[ItemRequest] = Field(min_length=1)
     condicion_pago:       CondicionPagoRequest  = CondicionPagoRequest()
@@ -318,6 +434,22 @@ class ConstanciaRequest(BaseModel):
 
 
 class AutofacturaRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "vendedor": {
+            "nombre": "JUAN PÉREZ",
+            "documento_tipo": 1,
+            "documento_numero": "1234567",
+            "tipo_vendedor": 1,
+            "direccion": "Barrio San Pablo, Asunción",
+        },
+        "items": [{"descripcion": "Compra de materiales de construcción", "cantidad": 1, "precio_unitario": 200000, "iva": 10}],
+        "condicion_pago": {"tipo": 1, "forma_pago": 1},
+        "constancia": {
+            "constancia_numero": "12345678901",
+            "constancia_control": "ABC12345",
+            "lugar": "Asunción",
+        },
+    }})
     vendedor:      VendedorRequest
     items:         List[ItemRequest] = Field(min_length=1)
     condicion_pago: CondicionPagoRequest = CondicionPagoRequest()
@@ -326,6 +458,16 @@ class AutofacturaRequest(BaseModel):
 
 
 class FacturaResponse(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "cdc": "01800695631001001000000012026112600000000001234561",
+        "numero_doc": 1,
+        "estado": "aprobado",
+        "codigo_sifen": "0422",
+        "descripcion_sifen": "CDC Autorizado",
+        "protocolo_autorizacion": "12345678901234567",
+        "kude_url": "/api/v1/facturas/01800695631001001000000012026112600000000001234561/kude",
+        "fecha_envio": "2026-11-26T10:30:00",
+    }})
     cdc: str
     numero_doc: int
     estado: str
