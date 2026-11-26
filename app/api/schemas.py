@@ -245,6 +245,53 @@ class FacturaRequest(BaseModel):
                 "condicion_pago": {"tipo": 1, "forma_pago": 1},
             },
         },
+        {
+            "summary": "Contado mixto: efectivo + transferencia",
+            "value": {
+                "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
+                "items": [{"descripcion": "Servicio de mantenimiento", "cantidad": 1, "precio_unitario": 1000000, "iva": 10}],
+                "condicion_pago": {
+                    "tipo": 1,
+                    "entregas": [
+                        {"forma_pago": 1, "monto": 400000},
+                        {"forma_pago": 5, "monto": 700000},
+                    ],
+                },
+            },
+        },
+        {
+            "summary": "Contado mixto: tarjeta + efectivo",
+            "value": {
+                "receptor": {"contribuyente": False, "documento_tipo": 1, "documento_numero": "1234567", "razon_social": "JUAN PÉREZ"},
+                "items": [{"descripcion": "Producto D", "cantidad": 2, "precio_unitario": 300000, "iva": 10}],
+                "condicion_pago": {
+                    "tipo": 1,
+                    "entregas": [
+                        {"forma_pago": 3, "monto": 500000},
+                        {"forma_pago": 1, "monto": 160000},
+                    ],
+                },
+            },
+        },
+        {
+            "summary": "Crédito en cuotas con detalle",
+            "value": {
+                "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
+                "items": [{"descripcion": "Equipo de computación", "cantidad": 1, "precio_unitario": 3300000, "iva": 10}],
+                "condicion_pago": {
+                    "tipo": 2,
+                    "credito": {
+                        "tipo": 2,
+                        "cuotas": 3,
+                        "info_cuotas": [
+                            {"moneda": "PYG", "monto": 1210000, "vencimiento": "2026-12-26"},
+                            {"moneda": "PYG", "monto": 1210000, "vencimiento": "2027-01-26"},
+                            {"moneda": "PYG", "monto": 1210000, "vencimiento": "2027-02-26"},
+                        ],
+                    },
+                },
+            },
+        },
     ]})
     receptor: ReceptorRequest
     items: List[ItemRequest] = Field(min_length=1)
@@ -320,13 +367,27 @@ class DocumentoReferencia(BaseModel):
 
 
 class NotaCreditoRequest(BaseModel):
-    model_config = ConfigDict(json_schema_extra={"example": {
-        "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
-        "items": [{"descripcion": "Devolución parcial — Servicio de consultoría", "cantidad": 1, "precio_unitario": 100000, "iva": 10}],
-        "condicion_pago": {"tipo": 1, "forma_pago": 1},
-        "motivo": 2,
-        "documento_referencia": {"cdc": "01800695631001001000000012026112600000000001234561", "formato": 1},
-    }})
+    model_config = ConfigDict(json_schema_extra={"examples": [
+        {
+            "summary": "NCE — devolución con acreditación en efectivo",
+            "value": {
+                "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
+                "items": [{"descripcion": "Devolución parcial — Servicio de consultoría", "cantidad": 1, "precio_unitario": 100000, "iva": 10}],
+                "condicion_pago": {"tipo": 1, "forma_pago": 1},
+                "motivo": 2,
+                "documento_referencia": {"cdc": "01800695631001001000000012026112600000000001234561", "formato": 1},
+            },
+        },
+        {
+            "summary": "NCE — descuento sin referencia a factura",
+            "value": {
+                "receptor": {"contribuyente": True, "ruc": "80069563-1", "razon_social": "EMPRESA CLIENTE S.A."},
+                "items": [{"descripcion": "Descuento comercial acordado", "cantidad": 1, "precio_unitario": 50000, "iva": 10}],
+                "condicion_pago": {"tipo": 1, "forma_pago": 5},
+                "motivo": 3,
+            },
+        },
+    ]})
     receptor:              ReceptorRequest
     items:                 List[ItemRequest] = Field(min_length=1)
     condicion_pago:        CondicionPagoRequest  = CondicionPagoRequest()
