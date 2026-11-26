@@ -1,0 +1,40 @@
+[Unit]
+Description=SIFEN Paraguay — Facturación Electrónica
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+# ── Ajustar estos valores según el servidor ──────────────────────────────────
+# Usuario del sistema que correrá el proceso (no usar root)
+User=sifen
+Group=sifen
+
+# Ruta donde está el repositorio clonado
+WorkingDirectory=/opt/FacturacionElectronica
+
+# Ruta completa al ejecutable uvicorn (python3 -m uvicorn como alternativa)
+ExecStart=/usr/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+# Si uvicorn no está en /usr/bin, buscarlo con: which uvicorn
+# y reemplazar la ruta arriba. Ejemplo con venv:
+#   ExecStart=/opt/FacturacionElectronica/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Reiniciar automáticamente si el proceso cae
+Restart=always
+RestartSec=5
+
+# Variables de entorno (alternativa a config.json si se prefiere)
+# Environment=PYTHONUNBUFFERED=1
+
+# Logs van a journald (ver con: journalctl -u sifen -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sifen
+
+# Límites
+TimeoutStartSec=30
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
