@@ -198,6 +198,11 @@
           Documento N° <strong id="anular-numero"></strong>
           <br><code id="anular-cdc" class="small"></code>
         </p>
+        <div id="anular-aviso-local" class="alert alert-warning small py-2 d-none">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Este documento <strong>no fue enviado a SIFEN</strong>. Se anulará solo en la base de datos local.
+          El número de documento quedará inutilizado.
+        </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Motivo de anulación <span class="text-danger">*</span></label>
           <textarea id="anular-motivo" class="form-control" rows="3"
@@ -464,10 +469,13 @@ async function confirmarCorreccion() {
 }
 
 function prepararAnulacion(btn) {
-  document.getElementById('anular-cdc').textContent    = btn.dataset.cdc;
-  document.getElementById('anular-numero').textContent = btn.dataset.numero;
-  document.getElementById('anular-motivo').value       = '';
+  document.getElementById('anular-cdc').textContent     = btn.dataset.cdc;
+  document.getElementById('anular-numero').textContent  = btn.dataset.numero;
+  document.getElementById('anular-motivo').value        = '';
   document.getElementById('anular-resultado').className = 'd-none';
+  const esLocal = btn.dataset.local === 'true';
+  document.getElementById('anular-aviso-local').classList.toggle('d-none', !esLocal);
+  document.getElementById('modalAnular').dataset.local = esLocal ? 'true' : '';
 }
 
 async function confirmarAnulacion() {

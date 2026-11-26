@@ -189,13 +189,25 @@
               </button>
               {% if doc.estado == 'aprobado' %}
               <button class="btn btn-outline-danger btn-sm ms-1"
-                      title="Anular documento"
+                      title="Anular documento (vía SIFEN)"
                       data-bs-toggle="modal"
                       data-bs-target="#modalAnular"
                       data-cdc="{{ doc.cdc }}"
                       data-numero="{{ doc.numero_doc }}"
                       onclick="prepararAnulacion(this)">
                 <i class="bi bi-x-circle"></i>
+              </button>
+              {% endif %}
+              {% if doc.estado in ('pendiente', 'en_lote', 'rechazado') %}
+              <button class="btn btn-outline-danger btn-sm ms-1"
+                      title="Anular localmente (antes de SIFEN)"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalAnular"
+                      data-cdc="{{ doc.cdc }}"
+                      data-numero="{{ doc.numero_doc }}"
+                      data-local="true"
+                      onclick="prepararAnulacion(this)">
+                <i class="bi bi-trash"></i>
               </button>
               {% endif %}
               {% if doc.estado == 'rechazado' and doc.data_json and (doc.codigo_sifen == '0420' or (doc.codigo_sifen and doc.codigo_sifen | int(0) >= 1300)) %}

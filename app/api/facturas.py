@@ -206,13 +206,17 @@ async def emitir_factura(req: FacturaRequest, _key: str = Depends(require_api_ke
 @router.post('/facturas/{cdc}/cancelar',   summary="Cancelar factura electrónica (alias)", include_in_schema=False)
 async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depends(require_api_key)):
     """
-    Cancela un DE aprobado enviando el evento de cancelación a SIFEN.
-    Solo se puede cancelar un documento en estado 'aprobado'.
+    Cancela un DE. El comportamiento depende del estado actual:
+
+    - **aprobado**: envía el evento de cancelación a SIFEN (requiere conexión).
+    - **pendiente / en_lote / rechazado**: anula localmente en BD sin contactar SIFEN.
+      Para `en_lote` el documento puede ya estar aprobado en SIFEN — se recomienda
+      consultar el resultado del lote antes de anular.
+    - **cancelado**: devuelve 422 (ya está cancelado).
     """
     if len(cdc) != 44:
         raise HTTPException(status_code=400, detail="CDC debe tener 44 dígitos")
 
-    # Verificar que existe y está aprobado
     db = Conexion()
     try:
         db.conectar()
@@ -226,23 +230,46 @@ async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depen
     if not fila:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
 
-    fila = dict(fila) if hasattr(fila, 'keys') else fila
-    if fila.get('estado') != 'aprobado':
-        raise HTTPException(
-            status_code=422,
-            detail=f"Solo se pueden cancelar documentos aprobados. Estado actual: {fila.get('estado')}"
-        )
+    fila   = dict(fila) if hasattr(fila, 'keys') else fila
+    estado = fila.get('estado')
+
+    if estado == 'cancelado':
+        raise HTTPException(status_code=422, detail="El documento ya está cancelado.")
+
+    # ── Documentos no enviados a SIFEN → cancelar localmente ─────────────────
+    if estado in ('pendiente', 'en_lote', 'rechazado'):
+        try:
+            db = Conexion()
+            db.conectar()
+            repo = RepositorioDE(db)
+            repo.marcar_cancelado(
+                cdc=cdc,
+                codigo='LOCAL',
+                descripcion=f"Anulado localmente — {body.motivo}",
+                respuesta_xml='',
+            )
+            db.cerrar()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        return {
+            "cdc": cdc,
+            "codigo_sifen": "LOCAL",
+            "descripcion": f"Documento anulado localmente (no fue enviado a SIFEN). Motivo: {body.motivo}",
+            "estado": "cancelado",
+        }
+
+    # ── Documento aprobado → evento de cancelación en SIFEN ──────────────────
+    if estado != 'aprobado':
+        raise HTTPException(status_code=422, detail=f"No se puede cancelar un documento en estado '{estado}'.")
 
     sifen_config = get_sifen_config()
-
     try:
         gestor = GestorEventos(sifen_config)
         respuesta = gestor.cancelar(cdc=cdc, motivo=body.motivo)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error procesando cancelación: {e}")
 
-    # Actualizar BD
-    # Actualizar BD solo si SIFEN aceptó el evento (0300 = recibido en cola)
     if respuesta.exitoso:
         try:
             db = Conexion()
