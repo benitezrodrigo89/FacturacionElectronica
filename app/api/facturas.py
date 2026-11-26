@@ -242,15 +242,13 @@ async def cancelar_factura(cdc: str, body: CancelacionRequest, _key: str = Depen
             db = Conexion()
             db.conectar()
             repo = RepositorioDE(db)
-            repo.marcar_cancelado(
-                cdc=cdc,
-                codigo='LOCAL',
-                descripcion=f"Anulado localmente — {body.motivo}",
-                respuesta_xml='',
-            )
+            ok = repo.cancelar_local(cdc=cdc, motivo=body.motivo)
             db.cerrar()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+        if not ok:
+            raise HTTPException(status_code=422, detail="No se pudo anular el documento.")
 
         return {
             "cdc": cdc,
